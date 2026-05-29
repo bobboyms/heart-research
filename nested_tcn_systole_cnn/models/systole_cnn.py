@@ -49,6 +49,8 @@ def make_cnn_args(args: argparse.Namespace, fold_dir: Path) -> argparse.Namespac
         smote_minority_augmentation=args.smote_minority_augmentation,
         smote_k_neighbors=args.smote_k_neighbors,
         smote_target_ratio=args.smote_target_ratio,
+        freq_norm=getattr(args, "freq_norm", "perbin"),
+        aux_pitch_loss_weight=getattr(args, "aux_pitch_loss_weight", 0.0),
         loss=args.loss,
         focal_gamma=args.focal_gamma,
         focal_alpha=args.focal_alpha,
@@ -102,6 +104,9 @@ def train_cnn_for_fold(
         spectrogram_type=args.spectrogram_type,
         n_mels=args.n_mels,
         stft_segment_mode=getattr(args, "stft_segment_mode", "concat"),
+        phase_contrast=bool(getattr(args, "phase_contrast", False)),
+        phase_contrast_dual=bool(getattr(args, "phase_contrast_dual", False)),
+        phase_contrast_robust=bool(getattr(args, "phase_contrast_robust", False)),
         use_ground_truth_segments=bool(getattr(args, "use_ground_truth_segments", False)),
         use_temporal_features=bool(getattr(args, "use_temporal_features", False)),
         window_mode=getattr(args, "window_mode", "phase"),
@@ -185,6 +190,7 @@ def train_cnn_for_fold(
         freq_linear_arch=getattr(args, "freq_linear_arch", "transformer"),
         freq_linear_heads=int(getattr(args, "freq_linear_heads", 4)),
         freq_linear_layers=int(getattr(args, "freq_linear_layers", 2)),
+        aux_pitch_classes=int(getattr(args, "aux_pitch_classes", 0)),
     )
     cnn_args = make_cnn_args(args, fold_dir)
     device = cnn_module.choose_device(args.cnn_device)

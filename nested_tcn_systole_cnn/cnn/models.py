@@ -86,20 +86,30 @@ class SystoleDilatedCNN(nn.Module):
             nn.Linear(head_in, 1),
         )
 
+        # Auxiliary multi-task head over the pooled encoder features (dim c, before any branch
+        # concatenation) so the gradient pushes the *encoder* to represent murmur pitch.
+        aux_classes = int(getattr(config, "aux_pitch_classes", 0))
+        self.aux_pitch_head = nn.Linear(c, aux_classes) if aux_classes > 0 else None
+
     def encode(self, x: torch.Tensor) -> torch.Tensor:
         encoded = self.encoder(x)
         return self.pool(encoded)
 
-    def forward(self, x: torch.Tensor, temporal: torch.Tensor | None = None) -> torch.Tensor:
+    def forward(self, x: torch.Tensor, temporal: torch.Tensor | None = None, return_aux: bool = False):
         pooled = self.encode(x)
+        aux_logits = self.aux_pitch_head(pooled) if self.aux_pitch_head is not None else None
+        feat = pooled
         if self.freq_linear is not None:
             band = x[:, self.freq_band_mask, :]                       # (B, n_band, T)
-            pooled = torch.cat([pooled, self.freq_linear(band)], dim=1)
+            feat = torch.cat([feat, self.freq_linear(band)], dim=1)
         if self.temporal_branch is not None:
             if temporal is None:
                 raise ValueError("Model expects temporal features but none were provided.")
-            pooled = torch.cat([pooled, self.temporal_branch(temporal)], dim=1)
-        return self.head(pooled).squeeze(-1)
+            feat = torch.cat([feat, self.temporal_branch(temporal)], dim=1)
+        logits = self.head(feat).squeeze(-1)
+        if return_aux:
+            return logits, aux_logits
+        return logits
 
 
 class SystoleRNN(nn.Module):

@@ -17,7 +17,7 @@ from .aggregate import aggregate_patient_location_features, aggregate_patient_pr
 from .augment import apply_smote_minority_augmentation, augmentation_config_from_args, build_cnn_augmenter
 from .calibration import apply_location_aware_calibrator, apply_platt_calibrator, fit_location_aware_calibrator, fit_platt_calibrator
 from .config import LOCATION_ORDER, ModelConfig, StftConfig
-from .dataset import SpectrogramDataset, build_train_loader, use_stratified_batches
+from .dataset import SpectrogramDataset, build_train_loader, compute_freq_norm_stats, encode_pitch_targets, use_stratified_batches
 from .losses import add_auc_loss, build_binary_loss
 from .metrics import average_precision, choose_threshold, metrics, roc_auc
 from .mil import train_one_fold_patient_mil
@@ -70,8 +70,7 @@ def train_one_fold(
     selection_indices = val_indices if tune_indices is None else tune_indices
     calibration_indices = train_indices if tune_indices is None else tune_indices
     train_subset = specs[train_indices]
-    train_mean = train_subset.mean(axis=(0, 2)).astype(np.float32)
-    train_std = (train_subset.std(axis=(0, 2)) + 1e-6).astype(np.float32)
+    train_mean, train_std = compute_freq_norm_stats(train_subset, str(getattr(args, "freq_norm", "perbin")))
     weak_murmur_weight = float(getattr(args, "weak_murmur_weight", 1.0))
     moderate_murmur_weight = float(getattr(args, "moderate_murmur_weight", 1.0))
     augmenter = build_cnn_augmenter(args)
@@ -111,6 +110,9 @@ def train_one_fold(
             k_neighbors=int(augmentation_config["smote_k_neighbors"]),
             target_ratio=float(augmentation_config["smote_target_ratio"]),
         )
+    aux_weight = float(getattr(args, "aux_pitch_loss_weight", 0.0))
+    aux_active = aux_weight > 0.0
+    train_aux = encode_pitch_targets(meta.iloc[train_indices], train_labels) if aux_active else None
     train_ds = SpectrogramDataset(
         train_specs,
         train_labels,
@@ -120,6 +122,7 @@ def train_one_fold(
         augmenter=augmenter,
         augmenter_minority_only=bool(augmentation_config["ltsrr_minority_only"]),
         temporal_features=None if temporal_all is None else temporal_all[train_indices],
+        aux_targets=train_aux,
     )
     val_ds = SpectrogramDataset(specs[val_indices], labels[val_indices], train_mean, train_std,
                                 temporal_features=None if temporal_all is None else temporal_all[val_indices])
@@ -138,6 +141,7 @@ def train_one_fold(
     history: list[dict[str, float | int]] = []
 
     mixup_alpha = float(getattr(args, "mixup_alpha", 0.0))
+    aux_loss_fn = nn.CrossEntropyLoss(ignore_index=-1) if aux_active else None
     for epoch in range(1, args.epochs + 1):
         model.train()
         losses: list[float] = []
@@ -158,9 +162,18 @@ def train_one_fold(
                 if temporal is not None:
                     temporal = lam * temporal + (1.0 - lam) * temporal[perm]
             optimizer.zero_grad(set_to_none=True)
-            logits = model(x, temporal) if temporal is not None else model(x)
+            if aux_active:
+                logits, aux_logits = (
+                    model(x, temporal, return_aux=True) if temporal is not None else model(x, return_aux=True)
+                )
+            else:
+                logits = model(x, temporal) if temporal is not None else model(x)
             loss = (loss_fn(logits, y) * sample_weight).mean()
             loss = add_auc_loss(loss, logits, y, args)
+            if aux_active and aux_logits is not None:
+                aux_y = batch[-1].to(device)
+                if bool((aux_y >= 0).any()):
+                    loss = loss + aux_weight * aux_loss_fn(aux_logits, aux_y)
             loss.backward()
             nn.utils.clip_grad_norm_(model.parameters(), 5.0)
             optimizer.step()

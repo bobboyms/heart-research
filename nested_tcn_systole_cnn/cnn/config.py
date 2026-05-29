@@ -60,6 +60,14 @@ class StftConfig:
     use_temporal_features: bool = False
     window_mode: str = "phase"
     peak_window_seconds: float = 1.0
+    # Re-reference the systole spectrogram by the same recording's diastole baseline per frequency
+    # (C[f,t] = systole_logmag - median_t diastole_logmag) to expose the systolic energy excess.
+    phase_contrast: bool = False
+    # Dual-channel: stack [systole, contrast] along the frequency axis -> (2*freq, T) so the encoder
+    # sees both the raw systole texture and the diastole-referenced contrast.
+    phase_contrast_dual: bool = False
+    # Robust contrast: divide by the diastole MAD per frequency (robust z-score), per Grupo B v3.1.
+    phase_contrast_robust: bool = False
 
 
 @dataclass(frozen=True)
@@ -91,6 +99,9 @@ class ModelConfig:
     freq_linear_arch: str = "transformer"  # "transformer" or "mlp"
     freq_linear_heads: int = 4
     freq_linear_layers: int = 2
+    # auxiliary multi-task head predicting systolic murmur pitch (Low/Medium/High) from the pooled
+    # encoder features. 0 disables. Supervised only on Present recordings (Tier 2 multi-task).
+    aux_pitch_classes: int = 0
 
 
 N_TEMPORAL_FEATURES = 12

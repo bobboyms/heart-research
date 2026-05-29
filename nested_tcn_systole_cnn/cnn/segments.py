@@ -68,14 +68,17 @@ def phase_label_counts(segments: pd.DataFrame) -> dict[int, int]:
 
 
 def predicted_tsv_path(predicted_tsv_dir: Path, wav_path: Path, stft_cfg: StftConfig) -> Path:
+    # phase-contrast retains diastole labels in the prediction, so its TSVs must not be shared
+    # with a plain systole-only run's cache.
+    pc_key = "_pc" if bool(getattr(stft_cfg, "phase_contrast", False)) else ""
     if stft_cfg.systole_threshold is None and stft_cfg.systole_margin_ms == 0:
         if stft_cfg.cnn_phase_mode != "systole":
-            return predicted_tsv_dir / f"{wav_path.stem}.predicted_phase{stft_cfg.cnn_phase_mode}.tsv"
-        return predicted_tsv_dir / f"{wav_path.stem}.predicted.tsv"
+            return predicted_tsv_dir / f"{wav_path.stem}.predicted_phase{stft_cfg.cnn_phase_mode}{pc_key}.tsv"
+        return predicted_tsv_dir / f"{wav_path.stem}.predicted{pc_key}.tsv"
     threshold_key = "argmax" if stft_cfg.systole_threshold is None else f"thr{format_float_key(stft_cfg.systole_threshold)}"
     margin_key = f"margin{format_float_key(stft_cfg.systole_margin_ms)}ms"
     phase_key = "" if stft_cfg.cnn_phase_mode == "systole" else f"_phase{stft_cfg.cnn_phase_mode}"
-    return predicted_tsv_dir / f"{wav_path.stem}.predicted{phase_key}_{threshold_key}_{margin_key}.tsv"
+    return predicted_tsv_dir / f"{wav_path.stem}.predicted{phase_key}{pc_key}_{threshold_key}_{margin_key}.tsv"
 
 
 def systole_probability_index(cfg: object) -> int:
@@ -91,6 +94,7 @@ def predict_tcn_segments(
     device: torch.device,
     systole_threshold: float | None,
     cnn_phase_mode: str,
+    phase_contrast: bool = False,
 ) -> pd.DataFrame:
     sample_rate, audio = tcn.read_audio(wav_path)
     features, centers_s, starts_s, ends_s = tcn.extract_frame_features(audio, sample_rate, cfg)
@@ -105,6 +109,11 @@ def predict_tcn_segments(
         systole_index = systole_probability_index(cfg)
         pred = np.zeros(probs.shape[0], dtype=np.int64)
         pred[probs[:, systole_index] >= systole_threshold] = systole_index
+        if phase_contrast:
+            # Keep diastole frames (by argmax) so the phase-contrast input has a within-recording
+            # reference. Does not alter the thresholded systole selection used as the main signal.
+            full = probs.argmax(axis=1)
+            pred[(full == LABEL_DIASTOLE) & (pred != systole_index)] = LABEL_DIASTOLE
     else:
         systole_index = systole_probability_index(cfg)
         pred = probs.argmax(axis=1).astype(np.int64)
@@ -141,6 +150,7 @@ def get_segments(
         device,
         stft_cfg.systole_threshold,
         stft_cfg.cnn_phase_mode,
+        bool(getattr(stft_cfg, "phase_contrast", False)),
     )
     write_segments(path, segments)
     return segments

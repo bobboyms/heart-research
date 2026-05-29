@@ -233,6 +233,59 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
+        "--freq-norm",
+        choices=["perbin", "global"],
+        default="perbin",
+        help=(
+            "How spectrogram normalization statistics are computed from the training set. "
+            "'perbin' (legacy/bc) z-scores each frequency bin independently over time+samples, "
+            "which whitens the cross-band energy ratio that encodes murmur pitch. "
+            "'global' uses a single scalar mean/std, preserving the spectral shape (better for "
+            "low-pitch murmurs at the possible cost of harsh mid-frequency cases)."
+        ),
+    )
+    parser.add_argument(
+        "--phase-contrast",
+        action="store_true",
+        help=(
+            "Re-reference the systole spectrogram by the same recording's diastole baseline per "
+            "frequency (C[f,t] = systole_logmag - median_t diastole_logmag). Cancels sensor/patient "
+            "coloration and exposes the systolic energy excess (the murmur); Absent recordings stay "
+            "near zero. Fixed DSP, no params. Requires --cnn-phase-mode systole, --stft-segment-mode "
+            "per-segment and --tcn-target-mode cardiac-phase (needs diastole segments)."
+        ),
+    )
+    parser.add_argument(
+        "--phase-contrast-robust",
+        action="store_true",
+        help=(
+            "Robust variant of --phase-contrast: divide the contrast by the diastole MAD per "
+            "frequency (robust z-score), per Grupo B v3.1 — 'how many robust std's above the "
+            "diastole baseline'. Amplifies bands with systolic excess (esp. low). Implies --phase-contrast."
+        ),
+    )
+    parser.add_argument(
+        "--phase-contrast-dual",
+        action="store_true",
+        help=(
+            "Dual-channel variant of --phase-contrast: stack [systole, diastole-referenced contrast] "
+            "along the frequency axis so the encoder sees both the raw systole texture and the "
+            "contrast. Implies --phase-contrast."
+        ),
+    )
+    parser.add_argument(
+        "--aux-pitch-loss-weight",
+        type=float,
+        default=0.0,
+        help=(
+            "Tier 2 multi-task: weight of an auxiliary cross-entropy head that predicts systolic "
+            "murmur pitch (Low/Medium/High) from the pooled encoder features, supervised only on "
+            "Present recordings. 0 disables. Forces the encoder to represent the low-band spectral "
+            "shape that plain per-bin normalization whitens away. Requires --model-arch cnn and is "
+            "incompatible with SMOTE, mixup, and --patient-mil-attention."
+        ),
+    )
+    parser.add_argument(
         "--use-ground-truth-segments",
         action="store_true",
         help=(
@@ -398,4 +451,27 @@ def validate_args(args: argparse.Namespace) -> None:
         raise ValueError("--auc-loss-margin must be non-negative.")
     if args.auc_loss_weight > 0.0 and args.cnn_batch_size < 2:
         raise ValueError("--cnn-batch-size must be at least 2 when --auc-loss-weight is enabled.")
+    aux_pitch_loss_weight = float(getattr(args, "aux_pitch_loss_weight", 0.0))
+    if aux_pitch_loss_weight < 0.0:
+        raise ValueError("--aux-pitch-loss-weight must be non-negative.")
+    if aux_pitch_loss_weight > 0.0:
+        if str(getattr(args, "model_arch", "cnn")) != "cnn":
+            raise ValueError("--aux-pitch-loss-weight requires --model-arch cnn.")
+        if args.patient_mil_attention:
+            raise ValueError("--aux-pitch-loss-weight is not supported with --patient-mil-attention.")
+        if args.smote_minority_augmentation:
+            raise ValueError("--aux-pitch-loss-weight is not supported with --smote-minority-augmentation.")
+        if float(getattr(args, "mixup_alpha", 0.0)) > 0.0:
+            raise ValueError("--aux-pitch-loss-weight is not supported with mixup.")
+    # The aux head emits one logit per pitch class (Low/Medium/High); 0 disables it downstream.
+    args.aux_pitch_classes = 3 if aux_pitch_loss_weight > 0.0 else 0
+    if bool(getattr(args, "phase_contrast_dual", False)) or bool(getattr(args, "phase_contrast_robust", False)):
+        args.phase_contrast = True  # dual/robust are variants of phase-contrast
+    if bool(getattr(args, "phase_contrast", False)):
+        if args.cnn_phase_mode != "systole":
+            raise ValueError("--phase-contrast requires --cnn-phase-mode systole.")
+        if getattr(args, "stft_segment_mode", "concat") != "per-segment":
+            raise ValueError("--phase-contrast requires --stft-segment-mode per-segment.")
+        if args.tcn_target_mode != "cardiac-phase":
+            raise ValueError("--phase-contrast requires --tcn-target-mode cardiac-phase (needs diastole segments).")
     parse_score_weights(args.score_weights)

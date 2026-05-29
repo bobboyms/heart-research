@@ -16,7 +16,7 @@ from .aggregate import aggregate_patient_location_features
 from .augment import augmentation_config_from_args, build_cnn_augmenter
 from .calibration import apply_location_aware_calibrator, apply_platt_calibrator, fit_location_aware_calibrator, fit_platt_calibrator
 from .config import LOCATION_ORDER, ModelConfig
-from .dataset import _broadcast_stats, build_train_loader, use_stratified_batches
+from .dataset import _broadcast_stats, build_train_loader, compute_freq_norm_stats, use_stratified_batches
 from .losses import add_auc_loss, build_binary_loss
 from .metrics import average_precision, choose_threshold, metrics, roc_auc
 from .models import SystoleDilatedCNN
@@ -272,8 +272,7 @@ def train_one_fold_patient_mil(
     selection_indices = val_indices if tune_indices is None else tune_indices
     calibration_indices = train_indices if tune_indices is None else tune_indices
     train_subset = specs[train_indices]
-    train_mean = train_subset.mean(axis=(0, 2)).astype(np.float32)
-    train_std = (train_subset.std(axis=(0, 2)) + 1e-6).astype(np.float32)
+    train_mean, train_std = compute_freq_norm_stats(train_subset, str(getattr(args, "freq_norm", "perbin")))
     weak_murmur_weight = float(getattr(args, "weak_murmur_weight", 1.0))
     moderate_murmur_weight = float(getattr(args, "moderate_murmur_weight", 1.0))
     max_instances = len(LOCATION_ORDER)

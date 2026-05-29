@@ -15,7 +15,7 @@ from tqdm.auto import tqdm
 from .audio import parse_recording_id, read_audio
 from .config import LABEL_DIASTOLE, LABEL_SYSTOLE, N_TEMPORAL_FEATURES, RecordingItem, StftConfig
 from .segments import extract_phase_audio, format_float_key, get_segments, parse_murmur_locations, phase_label_counts, phase_seconds_by_label, selected_phase_labels
-from .spectrogram import compute_temporal_features, peak_window_specs, phase_spectrogram, phase_spectrogram_per_segment
+from .spectrogram import compute_temporal_features, peak_window_specs, phase_contrast_spectrogram, phase_spectrogram, phase_spectrogram_per_segment
 
 
 def build_items(dataset_dir: Path, locations: list[str], max_recordings: int | None) -> list[RecordingItem]:
@@ -91,6 +91,12 @@ def cache_path(cache_dir: Path, item: RecordingItem, cfg: StftConfig) -> Path:
         key = f"{key}_{threshold_key}_{margin_key}"
     if getattr(cfg, "stft_segment_mode", "concat") == "per-segment":
         key = f"{key}_segmode-per-segment"
+    if getattr(cfg, "phase_contrast", False):
+        key = f"{key}_phasecontrast"
+        if getattr(cfg, "phase_contrast_dual", False):
+            key = f"{key}-dual"
+        if getattr(cfg, "phase_contrast_robust", False):
+            key = f"{key}-robust"
     if getattr(cfg, "use_ground_truth_segments", False):
         key = f"{key}_gtseg"
     if getattr(cfg, "use_temporal_features", False):
@@ -200,6 +206,12 @@ def prepare_spectrograms(
             diastole_segments = counts_by_label[LABEL_DIASTOLE] if LABEL_DIASTOLE in phase_labels else 0
             if phase_seconds < stft_cfg.min_systole_seconds:
                 spec = np.zeros((0, 0), dtype=np.float32)
+            elif getattr(stft_cfg, "phase_contrast", False):
+                spec = phase_contrast_spectrogram(
+                    audio, sample_rate, segments, stft_cfg,
+                    dual=bool(getattr(stft_cfg, "phase_contrast_dual", False)),
+                    robust=bool(getattr(stft_cfg, "phase_contrast_robust", False)),
+                )
             elif getattr(stft_cfg, "stft_segment_mode", "concat") == "per-segment":
                 spec = phase_spectrogram_per_segment(audio, sample_rate, segments, phase_labels, stft_cfg)
             else:
@@ -319,6 +331,42 @@ def _broadcast_stats(value: float | np.ndarray, freq_bins: int) -> np.ndarray:
     return array
 
 
+def compute_freq_norm_stats(train_subset: np.ndarray, mode: str) -> tuple[np.ndarray, np.ndarray]:
+    """Normalization mean/std from the training spectrograms (shape N, freq, time).
+
+    'perbin' (legacy): per-frequency-bin stats over samples+time -> shape (freq,). Z-scores each
+    bin independently, whitening the cross-band energy ratio that encodes murmur pitch.
+    'global': a single scalar mean/std preserving the spectral shape across bins.
+    SpectrogramDataset broadcasts a scalar to (freq, 1), so either return type is accepted.
+    """
+    if mode == "global":
+        mean = np.float32(train_subset.mean())
+        std = np.float32(train_subset.std() + 1e-6)
+        return mean, std
+    mean = train_subset.mean(axis=(0, 2)).astype(np.float32)
+    std = (train_subset.std(axis=(0, 2)) + 1e-6).astype(np.float32)
+    return mean, std
+
+
+_PITCH_CLASS = {"low": 0, "medium": 1, "high": 2}
+
+
+def encode_pitch_targets(meta, labels: np.ndarray) -> np.ndarray:
+    """Per-sample systolic murmur pitch class (Low=0, Medium=1, High=2) for the aux head.
+
+    Supervised only on Present recordings: samples whose binary label != 1 (Absent location or
+    Absent patient) and any missing/unknown pitch get -1, which CrossEntropyLoss(ignore_index=-1)
+    drops. `meta` is 1:1 with `labels`/`specs` by row index.
+    """
+    pitch = meta["systolic_murmur_pitch"].fillna("").astype(str).str.strip().str.lower() \
+        if "systolic_murmur_pitch" in meta.columns else None
+    classes = np.full(len(labels), -1, dtype=np.int64)
+    if pitch is not None:
+        classes = pitch.map(_PITCH_CLASS).fillna(-1).to_numpy().astype(np.int64)
+    classes[labels.astype(int) != 1] = -1
+    return classes
+
+
 class SpectrogramDataset(Dataset):
     def __init__(
         self,
@@ -330,6 +378,7 @@ class SpectrogramDataset(Dataset):
         augmenter: object | None = None,
         augmenter_minority_only: bool = False,
         temporal_features: np.ndarray | None = None,
+        aux_targets: np.ndarray | None = None,
     ) -> None:
         self.augmenter = augmenter
         self.augmenter_minority_only = bool(augmenter_minority_only)
@@ -345,6 +394,7 @@ class SpectrogramDataset(Dataset):
         self.labels = labels.astype(np.float32)
         self.sample_weights = None if sample_weights is None else sample_weights.astype(np.float32)
         self.temporal_features = None if temporal_features is None else temporal_features.astype(np.float32)
+        self.aux_targets = None if aux_targets is None else aux_targets.astype(np.int64)
 
     def __len__(self) -> int:
         return len(self.labels)
@@ -363,9 +413,13 @@ class SpectrogramDataset(Dataset):
             if self.sample_weights is not None
             else torch.tensor(1.0, dtype=torch.float32)
         )
+        # Preserve legacy tuple shapes: (x, y) when no weights/temporal/aux; otherwise (x, y, weight,
+        # [temporal,] [aux]). The aux target, when present, is always the last element.
+        if self.sample_weights is None and self.temporal_features is None and self.aux_targets is None:
+            return x, y
+        result: list[torch.Tensor] = [x, y, weight]
         if self.temporal_features is not None:
-            temporal = torch.from_numpy(self.temporal_features[index])
-            return x, y, weight, temporal
-        if self.sample_weights is not None:
-            return x, y, weight
-        return x, y
+            result.append(torch.from_numpy(self.temporal_features[index]))
+        if self.aux_targets is not None:
+            result.append(torch.tensor(self.aux_targets[index], dtype=torch.long))
+        return tuple(result)

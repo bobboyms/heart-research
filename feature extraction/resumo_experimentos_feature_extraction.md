@@ -285,6 +285,138 @@ Conclusao:
 
 Grupo C2 nao foi promissor. Ficou pior que C1, Grupo A e Grupo B v2.
 
+## Experimento 6 - Grupo B v3: contraste sistole menos diastole
+
+Pasta:
+
+```text
+feature extraction/Grupo B v3 contraste sistole menos diastole/
+```
+
+Script:
+
+```text
+extract_systole_diastole_contrast_clusters.py
+```
+
+Ideia:
+
+Testar diretamente a intuicao de usar a diastole como "ruido de fundo" da propria gravacao:
+
+```text
+contraste[f,t] = log(1 + |STFT(sistole)[f,t]|) - mediana_t(log(1 + |STFT(diastole)[f,t]|))
+```
+
+Depois resumir esse contraste por bandas e perfil de frequencia, gerar PCA/UMAP e rodar k-means.
+
+Resultado principal:
+
+| Nivel | Cluster enriquecido | % Present | Captura dos Present |
+|---|---:|---:|---:|
+| Gravacao global | 11 gravacoes | 100.0% | 1.8% |
+| AV | 6 gravacoes | 100.0% | 3.9% |
+| PV | 2 gravacoes | 100.0% | 1.4% |
+| TV | 3 gravacoes | 100.0% | 2.1% |
+| MV | 7 gravacoes | 85.7% | 3.5% |
+| Paciente agregado | 7 pacientes | 100.0% | 3.9% |
+
+Interpretacao:
+
+O contraste puro separa um nucleo pequeno e extremamente limpo de sopros, principalmente casos acusticamente evidentes. Porem, como cluster nao supervisionado resumido, ele captura poucos `Present`.
+
+Conclusao:
+
+O Grupo B v3 confirma qualitativamente que a subtracao da diastole revela o excesso sistolico, mas nao supera o Grupo B v2 para separacao ampla. Ele e melhor visto como visualizacao demonstrativa do mecanismo `phase_contrast`, nao como o melhor conjunto de features exploratorias.
+
+## Experimento 7 - Grupo B v3.1: contraste robusto por ciclo
+
+Pasta:
+
+```text
+feature extraction/Grupo B v3.1 contraste robusto por ciclo/
+```
+
+Script:
+
+```text
+extract_robust_cycle_contrast_clusters.py
+```
+
+Ideia:
+
+Incrementar o v3 para destacar mais pacientes com murmurio:
+
+- normalizar o contraste pela variabilidade robusta da diastole (`MAD`);
+- calcular features por ciclo sistolico;
+- agregar por `mean`, `max`, `p90` e `top3_mean`;
+- criar visoes separadas por banda (`low`, `mid`, `high`, `profile`, `all`);
+- rodar sweep de k-means com `k = 2, 4, 6, 8, 10`.
+
+Resultado principal paciente-level:
+
+| Leitura | Pacientes no grupo | Present | % Present | Captura dos Present |
+|---|---:|---:|---:|---:|
+| low band, k=2, melhor cluster | 69 | 67 | 97.1% | 37.4% |
+| mid band, k=6, clusters enriquecidos | 78 | 76 | 97.4% | 42.5% |
+| low band, k=10, clusters enriquecidos | 109 | 95 | 87.2% | 53.1% |
+
+Interpretacao:
+
+O incremento funcionou. O v3 puro gerava um cluster perfeito mas pequeno demais (7/7 pacientes `Present`). O v3.1 preservou alta pureza e ampliou a captura, principalmente na banda baixa (`25-200 Hz`).
+
+Conclusao:
+
+O Grupo B v3.1 melhorou bastante o v3 puro e virou a referencia a bater para clusterizacao exploratoria ampla.
+
+## Experimento 8 - Grupo B v3.2: murmur map realcado
+
+Pasta:
+
+```text
+feature extraction/Grupo B v3.2 murmur map realcado/
+```
+
+Script:
+
+```text
+extract_enhanced_murmur_map_clusters.py
+```
+
+Ideia:
+
+Realcar a regiao do murmurio antes de clusterizar:
+
+- cortar 15% do inicio e do fim da sistole para reduzir vazamento de `S1` e `S2`;
+- manter apenas contraste positivo `max(z, 0)`;
+- suavizar levemente o mapa tempo-frequencia;
+- aplicar threshold para remover ruido fraco;
+- extrair features de persistencia temporal;
+- usar STFT de maior resolucao na banda baixa;
+- salvar um mapa compacto `16 x 32` da banda baixa e heatmaps comparativos.
+
+Resultado principal paciente-level:
+
+| Leitura | Pacientes no grupo | Present | % Present | Captura dos Present |
+|---|---:|---:|---:|---:|
+| low band, k=2, melhor cluster | 85 | 84 | 98.8% | 46.9% |
+| low band, k=10, clusters enriquecidos | 101 | 98 | 97.0% | 54.7% |
+| mid band, k=10, clusters enriquecidos | 102 | 93 | 91.2% | 52.0% |
+
+Interpretacao:
+
+O realce da regiao do murmurio melhorou o v3.1: o melhor grupo amplo ficou mais puro e capturou mais `Present`.
+
+Conclusao:
+
+O Grupo B v3.2 passa a ser o melhor experimento exploratorio de clusterizacao. A comparacao principal e:
+
+| Experimento | Melhor grupo amplo | Present | % Present | Captura |
+|---|---:|---:|---:|---:|
+| Grupo B v3.1 | 109 pacientes | 95 | 87.2% | 53.1% |
+| Grupo B v3.2 | 101 pacientes | 98 | 97.0% | 54.7% |
+
+O proximo passo natural e usar features combinadas B v2 + B v3.2 em baseline supervisionado simples.
+
 ## Comparacao geral
 
 | Experimento | Tipo | Melhor resultado por paciente |
@@ -292,23 +424,26 @@ Grupo C2 nao foi promissor. Ficou pior que C1, Grupo A e Grupo B v2.
 | Grupo A | features classicas globais | 31.7% `Present` |
 | Grupo B v1 | features por fase com valores absolutos | sem separacao clara |
 | Grupo B v2 | features relativas por fase/local | 89.5% `Present` |
+| Grupo B v3 | contraste puro sistole-diastole | 100.0% `Present`, mas so 7 pacientes |
+| Grupo B v3.1 | contraste robusto por ciclo | 109 pacientes com 87.2% `Present` |
+| Grupo B v3.2 | murmur map realcado | 101 pacientes com 97.0% `Present` |
 | Grupo C1 | PANNs global | 28.5% `Present` |
 | Grupo C2 | PANNs por fase | 23.5% `Present` |
 
 ## Melhor experimento ate o momento
 
-O melhor experimento ate agora foi:
+O melhor experimento exploratorio para clusterizacao ate agora foi:
 
 ```text
-Grupo B v2: features relativas por local
+Grupo B v3.2: murmur map realcado
 ```
 
 Motivo:
 
-- produziu um cluster de 86 pacientes com 89.5% `Murmur = Present`;
-- tambem produziu clusters por local fortemente enriquecidos em sopro;
-- controlou melhor o efeito de volume ao remover RMS, peak, energia absoluta e `MFCC_1`;
-- usou informacao clinicamente alinhada ao problema: diferencas entre sistole e outras fases cardiacas.
+- produziu, na leitura `low k=10`, clusters enriquecidos com 101 pacientes, 98 `Present` e 97.0% de pureza;
+- capturou cerca de 54.7% dos pacientes `Present`, acima do Grupo B v3.1;
+- preservou uma leitura de alta pureza e maior captura: `low k=2` teve 85 pacientes com 98.8% `Present`;
+- gerou heatmaps comparativos da regiao realcada do murmurio.
 
 ## Conclusao atual
 
@@ -316,7 +451,9 @@ A melhor direcao nao e usar o audio inteiro nem embeddings pre-treinados globais
 
 O sinal mais forte apareceu quando usamos features relativas por fase cardiaca, especialmente comparando a sistole com `S1`, `S2` e diastole.
 
-Portanto, o proximo passo recomendado e treinar um baseline supervisionado usando as features do Grupo B v2, com validacao correta por paciente.
+O contraste puro sistole-diastole confirma o mecanismo acustico, mas como cluster manual ele detecta principalmente extremos. O contraste robusto por ciclo corrige isso em parte, e o murmur map realcado melhora mais a pureza/captura.
+
+Portanto, o proximo passo recomendado e treinar um baseline supervisionado usando features combinadas do Grupo B v2 e Grupo B v3.2, com validacao correta por paciente.
 
 Modelos sugeridos:
 
@@ -329,4 +466,3 @@ Validacao obrigatoria:
 - split por paciente;
 - `Unknown` fora do treino inicial;
 - metricas: sensibilidade, especificidade, balanced accuracy, AUPRC e matriz de confusao.
-

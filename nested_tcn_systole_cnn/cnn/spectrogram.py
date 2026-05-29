@@ -7,7 +7,7 @@ from scipy.signal import resample_poly, stft
 
 
 from .audio import resample_audio
-from .config import LABEL_SYSTOLE, N_TEMPORAL_FEATURES, StftConfig
+from .config import LABEL_DIASTOLE, LABEL_SYSTOLE, N_TEMPORAL_FEATURES, StftConfig
 
 
 def systole_stft(audio: np.ndarray, sample_rate: int, cfg: StftConfig) -> np.ndarray:
@@ -139,17 +139,16 @@ def _crop_or_pad(spec: np.ndarray, max_frames: int) -> np.ndarray:
     return padded
 
 
-def phase_spectrogram_per_segment(
+def _phase_frames(
     audio: np.ndarray,
     sample_rate: int,
     segments: pd.DataFrame,
     phase_labels: tuple[int, ...],
     cfg: StftConfig,
 ) -> np.ndarray:
-    """STFT computed per phase segment and then frame-concatenated.
+    """Per-segment STFT frames (freq x T) for `phase_labels`, concatenated, BEFORE crop/pad.
 
-    Avoids spectral leakage that occurs when disjoint segments are concatenated in the
-    time domain before a single STFT.
+    Returns log-magnitude (log1p|STFT|) for STFT or log-mel power for log-mel. Empty -> (0, 0).
     """
     resampled = resample_audio(audio, sample_rate, cfg.target_sample_rate)
     chunks = _segment_audio_chunks(resampled, cfg.target_sample_rate, segments, phase_labels, cfg.systole_margin_ms)
@@ -198,8 +197,72 @@ def phase_spectrogram_per_segment(
     if not frame_blocks:
         return np.zeros((0, 0), dtype=np.float32)
 
-    spec = np.concatenate(frame_blocks, axis=1)
+    return np.concatenate(frame_blocks, axis=1)
+
+
+def phase_spectrogram_per_segment(
+    audio: np.ndarray,
+    sample_rate: int,
+    segments: pd.DataFrame,
+    phase_labels: tuple[int, ...],
+    cfg: StftConfig,
+) -> np.ndarray:
+    """STFT computed per phase segment and then frame-concatenated.
+
+    Avoids spectral leakage that occurs when disjoint segments are concatenated in the
+    time domain before a single STFT.
+    """
+    spec = _phase_frames(audio, sample_rate, segments, phase_labels, cfg)
+    if spec.size == 0:
+        return np.zeros((0, 0), dtype=np.float32)
     return _crop_or_pad(spec, cfg.max_frames)
+
+
+# Robust-contrast constants (mirror Grupo B v3.1): floor on the diastole MAD to avoid blow-up where
+# the baseline is near-constant, and a z clip to tame extremes.
+_ROBUST_MAD_FLOOR = 0.03
+_ROBUST_Z_CLIP = 12.0
+
+
+def phase_contrast_spectrogram(
+    audio: np.ndarray,
+    sample_rate: int,
+    segments: pd.DataFrame,
+    cfg: StftConfig,
+    dual: bool = False,
+    robust: bool = False,
+) -> np.ndarray:
+    """Systole spectrogram re-referenced by the same recording's diastole baseline per frequency.
+
+    C[f, t] = systole_logmag[f, t] - median_t diastole_logmag[f]. Cancels the per-recording/sensor
+    coloration common to both phases and exposes the systolic energy excess (the murmur). For an
+    Absent recording systole ~= diastole so C ~= 0; for a murmur the systolic band lights up.
+    Diastole is murmur-free for ~97% of CirCor Present patients (only 5 have a diastolic murmur).
+    Falls back to the plain systole spectrogram when no diastole is available.
+
+    robust=True divides the contrast by the diastole MAD per frequency (robust z-score), so the
+    output is "how many robust std's above the diastole baseline" (Grupo B v3.1 feature). This
+    amplifies bands with systolic excess relative to their own background variability.
+    dual=True stacks [systole, contrast] along the frequency axis -> (2*freq, T); the two share the
+    same systole frames so their time axes are identical after the same crop/pad.
+    """
+    systole = _phase_frames(audio, sample_rate, segments, (LABEL_SYSTOLE,), cfg)
+    if systole.size == 0:
+        return np.zeros((0, 0), dtype=np.float32)
+    diastole = _phase_frames(audio, sample_rate, segments, (LABEL_DIASTOLE,), cfg)
+    if diastole.size > 0:
+        reference = np.median(diastole, axis=1, keepdims=True).astype(np.float32)
+        contrast = (systole - reference).astype(np.float32)
+        if robust:
+            mad = np.median(np.abs(diastole - reference), axis=1, keepdims=True).astype(np.float32)
+            contrast = np.clip(contrast / (mad + _ROBUST_MAD_FLOOR), -_ROBUST_Z_CLIP, _ROBUST_Z_CLIP).astype(np.float32)
+    else:
+        contrast = systole
+    contrast = _crop_or_pad(contrast, cfg.max_frames)
+    if not dual:
+        return contrast
+    systole = _crop_or_pad(systole, cfg.max_frames)
+    return np.concatenate([systole, contrast], axis=0).astype(np.float32)
 
 
 def compute_temporal_features(
