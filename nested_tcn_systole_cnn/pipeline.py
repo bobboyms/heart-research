@@ -31,14 +31,14 @@ def load_project_modules() -> tuple[ModuleType, ModuleType]:
 
 
 def build_recording_metadata(cnn_module: ModuleType, args: argparse.Namespace) -> tuple[list[object], pd.DataFrame]:
-    all_items = cnn_module.build_items(args.dataset_dir.resolve(), args.locations, None)
+    all_items = cnn_module.build_items(args.dataset_dir.resolve(), args.locations, None, target=getattr(args, "target", "murmur"))
     all_meta = pd.DataFrame(
         {
             "recording_id": [item.recording_id for item in all_items],
             "patient_id": [item.patient_id for item in all_items],
             "location": [item.location for item in all_items],
             "murmur": [item.murmur for item in all_items],
-            "target": [1 if item.murmur == "Present" else 0 for item in all_items],
+            "target": [1 if item.target_positive else 0 for item in all_items],
         }
     )
     all_meta = all_meta.merge(load_patient_context(args.dataset_dir.resolve()), on="patient_id", how="left")

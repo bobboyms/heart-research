@@ -18,10 +18,17 @@ from .segments import extract_phase_audio, format_float_key, get_segments, parse
 from .spectrogram import compute_temporal_features, peak_window_specs, phase_contrast_spectrogram, phase_spectrogram, phase_spectrogram_per_segment
 
 
-def build_items(dataset_dir: Path, locations: list[str], max_recordings: int | None) -> list[RecordingItem]:
+def build_items(dataset_dir: Path, locations: list[str], max_recordings: int | None,
+                target: str = "murmur") -> list[RecordingItem]:
     metadata = pd.read_csv(dataset_dir / "training_data.csv", dtype={"Patient ID": str})
-    metadata = metadata.loc[metadata["Murmur"].isin(["Present", "Absent"])].copy()
-    meta_by_patient = metadata.set_index("Patient ID")["Murmur"].to_dict()
+    if target == "outcome":
+        # Outcome target: keep every patient with a valid clinical label (Normal/Abnormal), including
+        # the Murmur=Unknown ones. The per-recording label is the patient Outcome (no location-aware).
+        metadata = metadata.loc[metadata["Outcome"].isin(["Normal", "Abnormal"])].copy()
+    else:
+        metadata = metadata.loc[metadata["Murmur"].isin(["Present", "Absent"])].copy()
+    meta_by_patient = metadata.set_index("Patient ID")["Murmur"].astype(str).to_dict()
+    outcome_by_patient = metadata.set_index("Patient ID")["Outcome"].astype(str).to_dict()
     murmur_locs_by_patient = (
         metadata.set_index("Patient ID")["Murmur locations"].to_dict()
         if "Murmur locations" in metadata.columns
@@ -37,11 +44,17 @@ def build_items(dataset_dir: Path, locations: list[str], max_recordings: int | N
         if location not in locations or patient_id not in meta_by_patient:
             continue
         patient_murmur = str(meta_by_patient[patient_id])
-        if patient_murmur == "Present":
-            murmur_locations = parse_murmur_locations(murmur_locs_by_patient.get(patient_id))
-            recording_present = location in murmur_locations
+        patient_outcome = str(outcome_by_patient.get(patient_id, ""))
+        if target == "outcome":
+            target_positive = patient_outcome == "Abnormal"
+            recording_present = target_positive  # patient-level label on every recording
         else:
-            recording_present = False
+            target_positive = patient_murmur == "Present"
+            if patient_murmur == "Present":
+                murmur_locations = parse_murmur_locations(murmur_locs_by_patient.get(patient_id))
+                recording_present = location in murmur_locations
+            else:
+                recording_present = False
         items.append(
             RecordingItem(
                 recording_id=wav_path.stem,
@@ -51,6 +64,8 @@ def build_items(dataset_dir: Path, locations: list[str], max_recordings: int | N
                 tsv_path=wav_path.with_suffix(".tsv"),
                 murmur=patient_murmur,
                 recording_present=recording_present,
+                target_positive=target_positive,
+                outcome=patient_outcome,
             )
         )
     if max_recordings is not None:
@@ -154,7 +169,7 @@ def prepare_spectrograms(
                     "patient_id": item.patient_id,
                     "location": item.location,
                     "murmur": item.murmur,
-                    "target": 1 if item.murmur == "Present" else 0,
+                    "target": 1 if item.target_positive else 0,
                     "recording_target": 1 if item.recording_present else 0,
                     "phase_mode": "peak1s",
                     "window_index": w,
@@ -242,7 +257,7 @@ def prepare_spectrograms(
             "patient_id": item.patient_id,
             "location": item.location,
             "murmur": item.murmur,
-            "target": 1 if item.murmur == "Present" else 0,
+            "target": 1 if item.target_positive else 0,
             "recording_target": 1 if item.recording_present else 0,
             "phase_mode": stft_cfg.cnn_phase_mode,
             "phase_seconds": phase_seconds,
@@ -367,6 +382,43 @@ def encode_pitch_targets(meta, labels: np.ndarray) -> np.ndarray:
     return classes
 
 
+_AGE_CATEGORIES = ["neonate", "infant", "child", "adolescent"]
+DEMOGRAPHIC_FEATURE_DIM = len(_AGE_CATEGORIES) + 1 + 1 + 1 + 2 + 2  # age(4)+unknown(1)+sex+preg+h/w z+h/w miss = 11
+
+
+def encode_demographics(meta) -> np.ndarray:
+    """Per-sample demographic feature vector (patient-level, repeated per recording).
+
+    Layout (11 dims): age one-hot [Neonate, Infant, Child, Adolescent, Unknown(=missing)],
+    sex (Male=1/Female=0), pregnancy (True=1), height_z, weight_z, height_missing, weight_missing.
+    Height/Weight are z-scored over the available values (global stats — negligible leakage for
+    continuous covariates) and set to 0 where missing, with an explicit missing flag. `meta` is
+    1:1 with specs/labels by row index.
+    """
+    n = len(meta)
+    age = meta["age"].fillna("").astype(str).str.strip().str.lower() if "age" in meta.columns else pd.Series([""] * n)
+    sex = meta["sex"].fillna("").astype(str).str.strip().str.lower() if "sex" in meta.columns else pd.Series([""] * n)
+    preg = meta["pregnancy_status"].astype(str).str.strip().str.lower() if "pregnancy_status" in meta.columns else pd.Series([""] * n)
+
+    feats = []
+    for cat in _AGE_CATEGORIES:
+        feats.append((age.to_numpy() == cat).astype(np.float32))
+    feats.append((~age.isin(_AGE_CATEGORIES)).to_numpy().astype(np.float32))  # age unknown/missing
+    feats.append((sex.to_numpy() == "male").astype(np.float32))
+    feats.append((preg.to_numpy() == "true").astype(np.float32))
+
+    for col in ("height", "weight"):
+        raw = pd.to_numeric(meta[col], errors="coerce") if col in meta.columns else pd.Series([np.nan] * n)
+        missing = raw.isna().to_numpy()
+        mean = float(raw[~raw.isna()].mean()) if (~raw.isna()).any() else 0.0
+        std = float(raw[~raw.isna()].std()) or 1.0
+        z = ((raw.fillna(mean) - mean) / std).to_numpy().astype(np.float32)
+        z[missing] = 0.0
+        feats.append(z)
+        feats.append(missing.astype(np.float32))
+    return np.stack(feats, axis=1).astype(np.float32)
+
+
 class SpectrogramDataset(Dataset):
     def __init__(
         self,
@@ -379,6 +431,7 @@ class SpectrogramDataset(Dataset):
         augmenter_minority_only: bool = False,
         temporal_features: np.ndarray | None = None,
         aux_targets: np.ndarray | None = None,
+        demo_features: np.ndarray | None = None,
     ) -> None:
         self.augmenter = augmenter
         self.augmenter_minority_only = bool(augmenter_minority_only)
@@ -395,6 +448,7 @@ class SpectrogramDataset(Dataset):
         self.sample_weights = None if sample_weights is None else sample_weights.astype(np.float32)
         self.temporal_features = None if temporal_features is None else temporal_features.astype(np.float32)
         self.aux_targets = None if aux_targets is None else aux_targets.astype(np.int64)
+        self.demo_features = None if demo_features is None else demo_features.astype(np.float32)
 
     def __len__(self) -> int:
         return len(self.labels)
@@ -415,11 +469,15 @@ class SpectrogramDataset(Dataset):
         )
         # Preserve legacy tuple shapes: (x, y) when no weights/temporal/aux; otherwise (x, y, weight,
         # [temporal,] [aux]). The aux target, when present, is always the last element.
-        if self.sample_weights is None and self.temporal_features is None and self.aux_targets is None:
+        if (self.sample_weights is None and self.temporal_features is None
+                and self.aux_targets is None and self.demo_features is None):
             return x, y
+        # Canonical order: x, y, weight, [temporal], [demo], [aux] — each present iff its field is set.
         result: list[torch.Tensor] = [x, y, weight]
         if self.temporal_features is not None:
             result.append(torch.from_numpy(self.temporal_features[index]))
+        if self.demo_features is not None:
+            result.append(torch.from_numpy(self.demo_features[index]))
         if self.aux_targets is not None:
             result.append(torch.tensor(self.aux_targets[index], dtype=torch.long))
         return tuple(result)

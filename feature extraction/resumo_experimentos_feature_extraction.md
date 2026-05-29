@@ -415,7 +415,52 @@ O Grupo B v3.2 passa a ser o melhor experimento exploratorio de clusterizacao. A
 | Grupo B v3.1 | 109 pacientes | 95 | 87.2% | 53.1% |
 | Grupo B v3.2 | 101 pacientes | 98 | 97.0% | 54.7% |
 
-O proximo passo natural e usar features combinadas B v2 + B v3.2 em baseline supervisionado simples.
+Otimização posterior:
+
+Foi feito um sweep sobre as features paciente-level ja extraidas do v3.2, variando subconjunto de features, scaler, PCA e `k`. O melhor resultado amplo veio de `low_persistence` com `StandardScaler`:
+
+| Configuracao | Pacientes selecionados | Present | % Present | Captura |
+|---|---:|---:|---:|---:|
+| v3.2 original, `low`, k=10 | 101 | 98 | 97.0% | 54.7% |
+| v3.2 otimizado, `low_persistence`, PCA 50, k=10 | 105 | 102 | 97.1% | 57.0% |
+| v3.2 otimizado, `low_persistence`, PCA 2, k=9 | 101 | 99 | 98.0% | 55.3% |
+
+A leitura de cluster unico tambem melhorou: `low_persistence`, PCA 2, k=2 gerou 85 pacientes, 85 `Present`, 100.0% de pureza e 47.5% de captura.
+
+O proximo passo natural e usar features combinadas B v2 + B v3.2 otimizado em baseline supervisionado simples.
+
+## Experimento 9 - Grupo B v3.3: textura na banda baixa + separabilidade
+
+Pasta:
+
+```text
+feature extraction/Grupo B v3.3 textura banda baixa e separabilidade/
+```
+
+Script:
+
+```text
+extract_lowband_texture_separability.py
+```
+
+Ideia (duas perguntas encadeadas):
+
+1. Dentro da banda baixa (<=260 Hz), que extracoes alem de energia/persistencia (v3.2) descrevem o sopro? Adicionou-se o eixo de TEXTURA ruido-vs-tonal e forma espectral: flatness/entropia, tilt, sub-bandas finas (25-80/80-150/150-260 Hz), skew/kurtosis, Gini/esparsidade, flux, proxy de HNR e razao sistole/diastole.
+2. Quanto um audio com sopro se afasta de um sem sopro? Camada explicita de SEPARABILIDADE: AUC/Cohen d por feature, Mahalanobis/Fisher/silhueta, e um score continuo de distancia de Mahalanobis ao centroide Absent.
+
+O script nao recomputa o v3.2: le o CSV salvo, extrai so a textura nova e junta por `recording_id`. Roda a separabilidade em tres conjuntos (v3.2 / textura / combinado).
+
+Resultado principal:
+
+- A feature individual mais forte de todas e NOVA: `tex_gini_map_p90` (AUC 0.864, d=-1.53). Sopro = Gini baixo = energia espalhada/sustentada pela banda baixa; normal = concentrada/transiente. Bate a melhor feature do v3.2 (energia low-mid, AUC 0.834).
+- A textura ADICIONA separacao multivariada, porem modesto: combinado Mahalanobis 3.02 vs v3.2 2.84; AUC dist-ao-Absent 0.851 vs 0.838 (nivel gravacao).
+- O score `dist_to_absent` e clinicamente coerente: Absent 20.8 < I/VI 49.8 ~ II/VI 37.9 << III/VI 181.2. Reproduz o achado de que sopros suaves ficam colados no normal.
+
+Ressalva: metricas multivariadas sao in-sample (sem CV); o `dist_to_absent_auc=1.0` no nivel paciente e artefato de p>>n (3152 features / ~850 pacientes) e deve ser ignorado. A AUC por feature e a leitura robusta.
+
+Conclusao:
+
+A "regiao de informacao" da banda baixa nao e so energia/persistencia: a textura (concentracao/Gini, variabilidade espectral) carrega o sinal mais forte por feature. A separacao Present x Absent agora tem metrica explicita e um score continuo de distancia-ao-normal alinhado ao grading. Proximo passo: levar o score (ou o subconjunto Gini+energia+persistencia+forma) a um baseline supervisionado com validacao por paciente.
 
 ## Comparacao geral
 
@@ -427,6 +472,8 @@ O proximo passo natural e usar features combinadas B v2 + B v3.2 em baseline sup
 | Grupo B v3 | contraste puro sistole-diastole | 100.0% `Present`, mas so 7 pacientes |
 | Grupo B v3.1 | contraste robusto por ciclo | 109 pacientes com 87.2% `Present` |
 | Grupo B v3.2 | murmur map realcado | 101 pacientes com 97.0% `Present` |
+| Grupo B v3.2 otimizado | persistencia em banda baixa | 105 pacientes com 97.1% `Present` |
+| Grupo B v3.3 | textura banda baixa + separabilidade | Gini AUC 0.864 (feature mais forte); score dist-ao-Absent ordena por grading |
 | Grupo C1 | PANNs global | 28.5% `Present` |
 | Grupo C2 | PANNs por fase | 23.5% `Present` |
 
@@ -440,9 +487,10 @@ Grupo B v3.2: murmur map realcado
 
 Motivo:
 
-- produziu, na leitura `low k=10`, clusters enriquecidos com 101 pacientes, 98 `Present` e 97.0% de pureza;
-- capturou cerca de 54.7% dos pacientes `Present`, acima do Grupo B v3.1;
-- preservou uma leitura de alta pureza e maior captura: `low k=2` teve 85 pacientes com 98.8% `Present`;
+- depois da otimizacao, produziu na leitura `low_persistence`, PCA 50, k=10, clusters enriquecidos com 105 pacientes, 102 `Present` e 97.1% de pureza;
+- capturou cerca de 57.0% dos pacientes `Present`, acima do Grupo B v3.1 e do v3.2 original;
+- preservou uma leitura simples de alta pureza: `low_persistence`, PCA 2, k=9 teve 101 pacientes com 98.0% `Present`;
+- melhorou o cluster unico: `low_persistence`, PCA 2, k=2 teve 85 pacientes com 100.0% `Present`;
 - gerou heatmaps comparativos da regiao realcada do murmurio.
 
 ## Conclusao atual
@@ -453,7 +501,7 @@ O sinal mais forte apareceu quando usamos features relativas por fase cardiaca, 
 
 O contraste puro sistole-diastole confirma o mecanismo acustico, mas como cluster manual ele detecta principalmente extremos. O contraste robusto por ciclo corrige isso em parte, e o murmur map realcado melhora mais a pureza/captura.
 
-Portanto, o proximo passo recomendado e treinar um baseline supervisionado usando features combinadas do Grupo B v2 e Grupo B v3.2, com validacao correta por paciente.
+Portanto, o proximo passo recomendado e treinar um baseline supervisionado usando features combinadas do Grupo B v2 e do Grupo B v3.2 otimizado, com validacao correta por paciente.
 
 Modelos sugeridos:
 

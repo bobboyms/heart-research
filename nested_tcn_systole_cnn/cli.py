@@ -256,6 +256,26 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
+        "--target",
+        choices=["murmur", "outcome"],
+        default="murmur",
+        help=(
+            "Prediction target. 'murmur' = Murmur Present vs Absent (location-aware, Unknown dropped). "
+            "'outcome' = clinical Normal vs Abnormal (balanced ~50/50; includes Murmur=Unknown patients; "
+            "per-recording label = patient Outcome, no location-aware)."
+        ),
+    )
+    parser.add_argument(
+        "--demographic",
+        action="store_true",
+        help=(
+            "Add a parallel demographic branch: Age/Sex/Height/Weight/Pregnancy are encoded "
+            "(one-hot + z-scored numerics with missing flags), embedded through a small MLP and "
+            "ADDED to the pooled CNN features before the classification head. Requires --model-arch "
+            "cnn; incompatible with SMOTE, mixup, --patient-mil-attention and --use-temporal-features."
+        ),
+    )
+    parser.add_argument(
         "--phase-contrast-robust",
         action="store_true",
         help=(
@@ -465,6 +485,17 @@ def validate_args(args: argparse.Namespace) -> None:
             raise ValueError("--aux-pitch-loss-weight is not supported with mixup.")
     # The aux head emits one logit per pitch class (Low/Medium/High); 0 disables it downstream.
     args.aux_pitch_classes = 3 if aux_pitch_loss_weight > 0.0 else 0
+    if bool(getattr(args, "demographic", False)):
+        if str(getattr(args, "model_arch", "cnn")) != "cnn":
+            raise ValueError("--demographic requires --model-arch cnn.")
+        if args.patient_mil_attention:
+            raise ValueError("--demographic is not supported with --patient-mil-attention.")
+        if args.smote_minority_augmentation:
+            raise ValueError("--demographic is not supported with --smote-minority-augmentation.")
+        if float(getattr(args, "mixup_alpha", 0.0)) > 0.0:
+            raise ValueError("--demographic is not supported with mixup.")
+        if bool(getattr(args, "use_temporal_features", False)):
+            raise ValueError("--demographic is not supported together with --use-temporal-features.")
     if bool(getattr(args, "phase_contrast_dual", False)) or bool(getattr(args, "phase_contrast_robust", False)):
         args.phase_contrast = True  # dual/robust are variants of phase-contrast
     if bool(getattr(args, "phase_contrast", False)):

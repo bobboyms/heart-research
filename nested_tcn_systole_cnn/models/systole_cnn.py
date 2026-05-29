@@ -142,6 +142,11 @@ def train_cnn_for_fold(
         "systolic_murmur_pitch",
         "systolic_murmur_quality",
         "outcome",
+        "age",
+        "sex",
+        "height",
+        "weight",
+        "pregnancy_status",
     ]
     context = all_meta[[col for col in patient_context_columns if col in all_meta.columns]].drop_duplicates("patient_id")
     meta = meta.merge(context, on="patient_id", how="left")
@@ -191,6 +196,8 @@ def train_cnn_for_fold(
         freq_linear_heads=int(getattr(args, "freq_linear_heads", 4)),
         freq_linear_layers=int(getattr(args, "freq_linear_layers", 2)),
         aux_pitch_classes=int(getattr(args, "aux_pitch_classes", 0)),
+        n_demographic_features=(cnn_module.DEMOGRAPHIC_FEATURE_DIM
+                                if bool(getattr(args, "demographic", False)) else 0),
     )
     cnn_args = make_cnn_args(args, fold_dir)
     device = cnn_module.choose_device(args.cnn_device)

@@ -66,3 +66,32 @@ Resumo pratico:
 
 O realce da regiao do murmurio foi util. O proximo passo mais defensavel e transformar essas features em score supervisionado simples e comparar por validacao paciente-level.
 
+## Otimizacao posterior de clusters
+
+Depois do v3.2, foi feito um sweep focado sobre as features paciente-level ja extraidas, sem recalcular audio. O teste variou subconjuntos de features, scaler, numero de componentes PCA e `k`.
+
+Melhor resultado amplo:
+
+| Configuracao | Pacientes selecionados | Present | % Present | Captura dos Present |
+|---|---:|---:|---:|---:|
+| `low_persistence`, `standard`, PCA 50, k=10, clusters com pureza >=90% | 105 | 102 | 97.1% | 57.0% |
+
+Melhor leitura simples de alta pureza:
+
+| Configuracao | Pacientes selecionados | Present | % Present | Captura dos Present |
+|---|---:|---:|---:|---:|
+| `low_persistence`, `standard`, PCA 2, k=9, clusters com pureza >=95% | 101 | 99 | 98.0% | 55.3% |
+
+Melhor cluster unico:
+
+| Configuracao | Pacientes no cluster | Present | % Present | Captura dos Present |
+|---|---:|---:|---:|---:|
+| `low_persistence`, `standard`, PCA 2, k=2 | 85 | 85 | 100.0% | 47.5% |
+
+Interpretacao: a informacao mais util esta menos no mapa bruto inteiro e mais nas features de persistencia do contraste positivo em banda baixa. O sopro destacado parece ser um excesso sistolico sustentado, nao apenas um pico isolado.
+
+Detalhes em:
+
+```text
+outputs/cluster_optimization_focused/interpretacao_resultados.md
+```

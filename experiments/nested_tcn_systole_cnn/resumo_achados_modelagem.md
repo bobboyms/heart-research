@@ -257,6 +257,40 @@ nem "300" — é que **o sinal discriminativo está em ≤~300 Hz e descartar o 
 Próximos passos: **reframe** (`Outcome` / II/VI+); **transfer PhysioNet 2016**; demografia. (Testar <200 Hz
 é baixo valor — platô + risco de sobrepor S1/S2; agregação por ciclo da v3.1 ainda em aberto.)
 
+### Triagem das ideias da v3.2 (murmur map realçado) p/ o supervisionado
+A v3.2 melhorou o clustering (cluster único 98.8% Present) com 7 incrementos. Regra aprendida (vinda do ÷MAD):
+**transformações que o CNN já aprende não transferem; só mudanças de informação transferem.**
+- **Provável-redundante (CNN já faz):** rectificar `max(z,0)`, suavização gaussiana, threshold `z≥1`,
+  features de persistência. ÷MAD **já testado, pior** (0.8533).
+- **Mudança de informação (testável):** (A) **corte central da sístole** (remover S1/S2 das bordas);
+  (C) **n_fft maior na banda baixa** (mais resolução).
+- **(A) margin 0 — TESTADO, PIOR** (~0.839 em 4 folds vs lb300 0.881; abortado): a expansão de 50ms ajuda
+  (o contraste já cancela S1/S2 das bordas → a expansão só dá mais cobertura de sístole). Center-crop não transfere.
+- **(C) n_fft 256 — TESTADO, PIOR** (0.8750 vs 0.8844; low-pitch 0.498→0.449, `29045` 0.909→0.712):
+  janela maior piora a resolução temporal; o sinal do sopro está na **textura temporal** (envelope
+  sustentado), não em detalhe fino de frequência.
+
+**Conclusão da triagem v3.2:** nenhum refinamento transfere (÷MAD, center-crop, n_fft↑ todos piores;
+rectify/smooth/threshold/persistência previstos redundantes). Só o **conceito** da linha v3 transferiu
+(contraste + banda baixa). **`lb300` (0.8844) permanece o melhor.**
+
+### Ramo demográfico (Age/Sex/Height/Weight/Pregnancy → embedding → somado ao pooled) — TESTADO no Murmur, PIOR
+`phase_contrast_lb300_demo_reuse_tcn`: AUPRC **0.8759** / AUROC 0.9322 (−0.009 vs lb300). Confirma a previsão
+a partir dos dados: no alvo `Murmur` a demografia tem **sinal fraco** (P(Present): Age 0.17–0.22, Sex 0.189/0.191
+≈0). FN@0.5 caiu 44→40 mas o ranking piorou (capacidade extra sem sinal). **Ramo implementado e reutilizável
+(`--demographic`, fusão por soma); guardar para o alvo `Outcome`** (idade ↔ anormalidade; ajuda os 263 Abnormal-sem-sopro).
+Flag `--demographic` (one-hot+numéricos→MLP→soma no pooled); validações: requer cnn, incompat SMOTE/mixup/MIL/temporal.
+
+### Reframe `Outcome` (Normal/Abnormal) — explorado e DESCARTADO pelo usuário
+Implementado `--target {murmur,outcome}` (outcome inclui os 68 Unknown-murmur; label = patient Outcome, sem
+location-aware). Probe com phase-contrast+lb300, GT seg, 942 pacientes (48% Abnormal): **AUPRC 0.7106 /
+AUROC 0.6764** — muito abaixo do Murmur (0.94). Demografia ajudava (AUROC ~0.71, parcial). **Veredito do
+usuário: não é o caminho** — todo o pipeline foi otimizado para o **evento acústico** (sopro), e o Outcome
+mistura anormalidades sem assinatura no PCG (263 Abnormal sem sopro = piso de outro tipo). Código `--target`/
+`--demographic` fica disponível (default murmur, backward-compat), mas o foco permanece no Murmur acústico.
+**Melhor modelo segue `lb300` (0.8844).** A avenida phase-contrast+low-band está
+bem otimizada; ganho adicional só fora dela (reframe `Outcome` / transfer / demografia).
+
 ## Melhor modelo (baseline a bater)
 
 **`bc_locaware_perseg_focalfix_perfreqnorm` — AUPRC 0.8459, AUROC 0.9115, F1 0.7758, std-fold 0.064.**

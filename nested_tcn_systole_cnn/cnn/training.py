@@ -17,7 +17,7 @@ from .aggregate import aggregate_patient_location_features, aggregate_patient_pr
 from .augment import apply_smote_minority_augmentation, augmentation_config_from_args, build_cnn_augmenter
 from .calibration import apply_location_aware_calibrator, apply_platt_calibrator, fit_location_aware_calibrator, fit_platt_calibrator
 from .config import LOCATION_ORDER, ModelConfig, StftConfig
-from .dataset import SpectrogramDataset, build_train_loader, compute_freq_norm_stats, encode_pitch_targets, use_stratified_batches
+from .dataset import SpectrogramDataset, build_train_loader, compute_freq_norm_stats, encode_demographics, encode_pitch_targets, use_stratified_batches
 from .losses import add_auc_loss, build_binary_loss
 from .metrics import average_precision, choose_threshold, metrics, roc_auc
 from .mil import train_one_fold_patient_mil
@@ -29,12 +29,24 @@ def predict_recordings(model: nn.Module, dataset: SpectrogramDataset, batch_size
     loader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
     model.eval()
     has_temporal = getattr(dataset, "temporal_features", None) is not None
+    has_demo = getattr(dataset, "demo_features", None) is not None
     probs: list[np.ndarray] = []
     with torch.no_grad():
         for batch in loader:
             x = batch[0].to(device)
-            temporal = batch[3].to(device) if has_temporal else None
-            logits = model(x, temporal) if has_temporal else model(x)
+            extra_idx = 3
+            temporal = None
+            if has_temporal and len(batch) > extra_idx:
+                temporal = batch[extra_idx].to(device); extra_idx += 1
+            demo = None
+            if has_demo and len(batch) > extra_idx:
+                demo = batch[extra_idx].to(device); extra_idx += 1
+            if has_demo:
+                logits = model(x, temporal=temporal, demo=demo)
+            elif has_temporal:
+                logits = model(x, temporal)
+            else:
+                logits = model(x)
             probs.append(torch.sigmoid(logits).detach().cpu().numpy())
     return np.concatenate(probs)
 
@@ -113,6 +125,8 @@ def train_one_fold(
     aux_weight = float(getattr(args, "aux_pitch_loss_weight", 0.0))
     aux_active = aux_weight > 0.0
     train_aux = encode_pitch_targets(meta.iloc[train_indices], train_labels) if aux_active else None
+    demo_active = int(getattr(model_config, "n_demographic_features", 0)) > 0
+    demo_all = encode_demographics(meta) if demo_active else None
     train_ds = SpectrogramDataset(
         train_specs,
         train_labels,
@@ -123,11 +137,14 @@ def train_one_fold(
         augmenter_minority_only=bool(augmentation_config["ltsrr_minority_only"]),
         temporal_features=None if temporal_all is None else temporal_all[train_indices],
         aux_targets=train_aux,
+        demo_features=None if demo_all is None else demo_all[train_indices],
     )
     val_ds = SpectrogramDataset(specs[val_indices], labels[val_indices], train_mean, train_std,
-                                temporal_features=None if temporal_all is None else temporal_all[val_indices])
+                                temporal_features=None if temporal_all is None else temporal_all[val_indices],
+                                demo_features=None if demo_all is None else demo_all[val_indices])
     selection_ds = SpectrogramDataset(specs[selection_indices], labels[selection_indices], train_mean, train_std,
-                                      temporal_features=None if temporal_all is None else temporal_all[selection_indices])
+                                      temporal_features=None if temporal_all is None else temporal_all[selection_indices],
+                                      demo_features=None if demo_all is None else demo_all[selection_indices])
     loader = build_train_loader(train_ds, train_labels, args)
     model = build_systole_model(model_config).to(device)
     pos = float((train_labels == 1).sum())
@@ -149,7 +166,13 @@ def train_one_fold(
             x = batch[0]
             y = batch[1]
             sample_weight = batch[2] if len(batch) > 2 else torch.ones_like(y)
-            temporal = batch[3].to(device) if (n_temporal > 0 and len(batch) > 3) else None
+            extra_idx = 3
+            temporal = None
+            if n_temporal > 0 and len(batch) > extra_idx:
+                temporal = batch[extra_idx].to(device); extra_idx += 1
+            demo = None
+            if demo_active and len(batch) > extra_idx:
+                demo = batch[extra_idx].to(device); extra_idx += 1
             x = x.to(device)
             y = y.to(device)
             sample_weight = sample_weight.to(device)
@@ -162,10 +185,13 @@ def train_one_fold(
                 if temporal is not None:
                     temporal = lam * temporal + (1.0 - lam) * temporal[perm]
             optimizer.zero_grad(set_to_none=True)
-            if aux_active:
-                logits, aux_logits = (
-                    model(x, temporal, return_aux=True) if temporal is not None else model(x, return_aux=True)
-                )
+            if aux_active or demo_active:
+                # aux/demo branches require --model-arch cnn, whose forward accepts these kwargs.
+                out = model(x, temporal=temporal, demo=demo, return_aux=aux_active)
+                if aux_active:
+                    logits, aux_logits = out
+                else:
+                    logits = out
             else:
                 logits = model(x, temporal) if temporal is not None else model(x)
             loss = (loss_fn(logits, y) * sample_weight).mean()
@@ -205,7 +231,8 @@ def train_one_fold(
     model.load_state_dict(best_state)
     val_record_probs = predict_recordings(model, val_ds, args.batch_size, device)
     calibration_ds = SpectrogramDataset(specs[calibration_indices], labels[calibration_indices], train_mean, train_std,
-                                        temporal_features=None if temporal_all is None else temporal_all[calibration_indices])
+                                        temporal_features=None if temporal_all is None else temporal_all[calibration_indices],
+                                        demo_features=None if demo_all is None else demo_all[calibration_indices])
     calibration_record_probs = predict_recordings(model, calibration_ds, args.batch_size, device)
     calibration_patient = aggregate_patient_probs(meta, calibration_record_probs, calibration_indices, method="max")
     val_patient = aggregate_patient_probs(meta, val_record_probs, val_indices, method="max")

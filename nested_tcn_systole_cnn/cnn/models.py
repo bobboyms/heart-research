@@ -91,13 +91,32 @@ class SystoleDilatedCNN(nn.Module):
         aux_classes = int(getattr(config, "aux_pitch_classes", 0))
         self.aux_pitch_head = nn.Linear(c, aux_classes) if aux_classes > 0 else None
 
+        # Parallel demographic branch: embed the demographic vector and ADD it to the pooled
+        # encoder features (dim c) before the head. The first Linear is the learned embedding.
+        n_demo = int(getattr(config, "n_demographic_features", 0))
+        if n_demo > 0:
+            demo_hidden = max(16, c)
+            self.demographic_branch = nn.Sequential(
+                nn.Linear(n_demo, demo_hidden),
+                nn.GELU(),
+                nn.Dropout(config.dropout),
+                nn.Linear(demo_hidden, c),
+            )
+        else:
+            self.demographic_branch = None
+
     def encode(self, x: torch.Tensor) -> torch.Tensor:
         encoded = self.encoder(x)
         return self.pool(encoded)
 
-    def forward(self, x: torch.Tensor, temporal: torch.Tensor | None = None, return_aux: bool = False):
+    def forward(self, x: torch.Tensor, temporal: torch.Tensor | None = None,
+                demo: torch.Tensor | None = None, return_aux: bool = False):
         pooled = self.encode(x)
         aux_logits = self.aux_pitch_head(pooled) if self.aux_pitch_head is not None else None
+        if self.demographic_branch is not None:
+            if demo is None:
+                raise ValueError("Model expects demographic features but none were provided.")
+            pooled = pooled + self.demographic_branch(demo)
         feat = pooled
         if self.freq_linear is not None:
             band = x[:, self.freq_band_mask, :]                       # (B, n_band, T)

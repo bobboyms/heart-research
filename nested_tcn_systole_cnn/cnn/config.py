@@ -102,6 +102,9 @@ class ModelConfig:
     # auxiliary multi-task head predicting systolic murmur pitch (Low/Medium/High) from the pooled
     # encoder features. 0 disables. Supervised only on Present recordings (Tier 2 multi-task).
     aux_pitch_classes: int = 0
+    # Parallel demographic branch: embeds the demographic vector through an MLP and ADDS it to the
+    # pooled encoder features before the classification head. 0 disables.
+    n_demographic_features: int = 0
 
 
 N_TEMPORAL_FEATURES = 12
@@ -116,3 +119,6 @@ class RecordingItem:
     tsv_path: Path
     murmur: str
     recording_present: bool
+    # Patient-level positive label for the chosen --target (murmur Present, or Abnormal outcome).
+    target_positive: bool = False
+    outcome: str = ""

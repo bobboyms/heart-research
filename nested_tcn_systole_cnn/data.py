@@ -24,6 +24,12 @@ def load_patient_context(dataset_dir: Path) -> pd.DataFrame:
         "Systolic murmur pitch": "systolic_murmur_pitch",
         "Systolic murmur quality": "systolic_murmur_quality",
         "Outcome": "outcome",
+        # Demographics (patient-level inputs for the optional --demographic branch).
+        "Age": "age",
+        "Sex": "sex",
+        "Height": "height",
+        "Weight": "weight",
+        "Pregnancy status": "pregnancy_status",
     }
     available = [col for col in columns if col in table.columns]
     context = table[available].rename(columns=columns).copy()
