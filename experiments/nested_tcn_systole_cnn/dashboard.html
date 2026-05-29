@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Nested TCN + Systole CNN Experiments</title>
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --bg: #f7f8fa;
+      --panel: #ffffff;
+      --text: #18202a;
+      --muted: #617080;
+      --line: #d8dee6;
+      --accent: #0f766e;
+      --accent-soft: #d9f3ef;
+      --bad: #b42318;
+    }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+    }
+    header {
+      padding: 28px 32px 18px;
+      border-bottom: 1px solid var(--line);
+      background: var(--panel);
+    }
+    h1 {
+      margin: 0 0 8px;
+      font-size: 24px;
+      font-weight: 720;
+    }
+    .subtle {
+      color: var(--muted);
+      font-size: 14px;
+    }
+    main {
+      padding: 24px 32px 40px;
+    }
+    .toolbar {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+    input, select {
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: white;
+      color: var(--text);
+      font: inherit;
+      padding: 9px 10px;
+    }
+    input {
+      min-width: 300px;
+    }
+    .metric-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+    .metric {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 14px;
+    }
+    .metric-label {
+      color: var(--muted);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0;
+    }
+    .metric-value {
+      margin-top: 6px;
+      font-size: 22px;
+      font-weight: 720;
+    }
+    .table-wrap {
+      overflow: auto;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+    }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      min-width: 1280px;
+      font-size: 13px;
+    }
+    th, td {
+      border-bottom: 1px solid var(--line);
+      padding: 9px 10px;
+      text-align: left;
+      white-space: nowrap;
+    }
+    th {
+      position: sticky;
+      top: 0;
+      background: #eef2f5;
+      cursor: pointer;
+      user-select: none;
+      font-weight: 680;
+    }
+    tr.best {
+      background: var(--accent-soft);
+    }
+    .status-failed {
+      color: var(--bad);
+      font-weight: 680;
+    }
+    a {
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 620;
+    }
+    a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Nested TCN + Systole CNN Experiments</h1>
+    <div class="subtle">Dashboard estatico gerado a partir de registry.csv. Regere este HTML apos novos treinos.</div>
+  </header>
+  <main>
+    <section class="metric-grid" id="metrics"></section>
+    <div class="toolbar">
+      <input id="search" type="search" placeholder="Filtrar por nome, status, parametros ou pasta">
+      <select id="status">
+        <option value="">Todos os status</option>
+        <option value="completed">completed</option>
+        <option value="running">running</option>
+        <option value="failed">failed</option>
+      </select>
+    </div>
+    <div class="table-wrap">
+      <table id="experiments"></table>
+    </div>
+  </main>
+  <script>
+    const rows = [{"run_id": "tcn_attn_weight2_platt_thr045_ignore__20260526_131751_962264", "run_name": "tcn_attn_weight2_platt_thr045_ignore", "status": "completed", "updated_at": "2026-05-26T19:24:57Z", "output_dir": "/Users/thiagorodrigues/Desktop/obsidian/heart-research/experiments/nested_tcn_systole_cnn/tcn_attn_weight2_platt_thr045_ignore__20260526_131751_962264", "summary_path": "/Users/thiagorodrigues/Desktop/obsidian/heart-research/experiments/nested_tcn_systole_cnn/tcn_attn_weight2_platt_thr045_ignore__20260526_131751_962264/summary.md", "metrics_summary_path": "/Users/thiagorodrigues/Desktop/obsidian/heart-research/experiments/nested_tcn_systole_cnn/tcn_attn_weight2_platt_thr045_ignore__20260526_131751_962264/metrics_summary.json", "tcn_target_mode": "cardiac-phase", "tcn_other_mode": "ignore", "tcn_systole_weight_multiplier": 2.0, "tcn_boundary_ignore_ms": 10.0, "cnn_epochs": 50, "cnn_inner_val_size": 0.15, "encoder_block": "residual", "pooling": "attention", "patient_mil_attention": false, "weak_murmur_weight": 1.0, "moderate_murmur_weight": 1.0, "decision_threshold": 0.5, "score_weights": "sensitivity=1,specificity=1,precision=1,f1=1", "error": "", "threshold": 0.5, "auroc": 0.9051886982034484, "auprc": 0.8415424681591178, "balanced_accuracy": 0.8291869297857803, "sensitivity": 0.6871508379888268, "specificity": 0.9712230215827338, "precision": 0.8601398601398601, "precision_ppv": 0.8601398601398601, "f1": 0.7639751552795031, "brier_score": 0.0695665531957675, "mean_score": 0.820622218747731, "tn": 675.0, "fp": 20.0, "fn": 56.0, "tp": 123.0, "cnn_phase_mode": ""}, {"run_id": "tcn_attn_weight2_platt_thr045_ignore_both_phases__20260526_165429_523746", "run_name": "tcn_attn_weight2_platt_thr045_ignore_both_phases", "status": "failed", "updated_at": "2026-05-26T21:25:58Z", "output_dir": "/Users/thiagorodrigues/Desktop/obsidian/heart-research/experiments/nested_tcn_systole_cnn/tcn_attn_weight2_platt_thr045_ignore_both_phases__20260526_165429_523746", "summary_path": "/Users/thiagorodrigues/Desktop/obsidian/heart-research/experiments/nested_tcn_systole_cnn/tcn_attn_weight2_platt_thr045_ignore_both_phases__20260526_165429_523746/summary.md", "metrics_summary_path": "/Users/thiagorodrigues/Desktop/obsidian/heart-research/experiments/nested_tcn_systole_cnn/tcn_attn_weight2_platt_thr045_ignore_both_phases__20260526_165429_523746/metrics_summary.json", "tcn_target_mode": "cardiac-phase", "tcn_other_mode": "ignore", "tcn_systole_weight_multiplier": 2.0, "tcn_boundary_ignore_ms": 10.0, "cnn_epochs": 50, "cnn_inner_val_size": 0.15, "encoder_block": "residual", "pooling": "attention", "patient_mil_attention": false, "weak_murmur_weight": 1.0, "moderate_murmur_weight": 1.0, "decision_threshold": 0.5, "score_weights": "sensitivity=1,specificity=1,precision=1,f1=1", "error": "Command '['/Users/thiagorodrigues/Desktop/obsidian/heart-research/.venv/bin/python3', '/Users/thiagorodrigues/Desktop/obsidian/heart-research/modeling/Grupo E TCN segmentacao frame a frame/train_tcn_frame_segmenter.py', '--dataset-dir', '/Users/thiagorodrigues/Desktop/obsidian/heart-research/experiments/nested_tcn_systole_cnn/tcn_attn_weight2_platt_thr045_ignore_both_phases__20260526_165429_523746/fold_3/tcn_dataset_train_patients', '--output-dir', '/Users/thiagorodrigues/Desktop/obsidian/heart-research/experiments/nested_tcn_systole_cnn/tcn_attn_weight2_platt_thr045_ignore_both_phases__20260526_165429_523746/fold_3/tcn', '--epochs', '10', '--batch-size', '42', '--device', 'mps', '--val-size', '0.15', '--test-size', '0.15', '--label-mode', 'overlap', '--target-mode', 'cardiac-phase', '--other-mode', 'ignore', '--boundary-ignore-ms', '10.0', '--systole-weight-multiplier', '2.0', '--no-causal', '--pooling', 'attention', '--exclude-murmur-unknown']' returned non-zero exit status 1.", "threshold": "", "auroc": "", "auprc": "", "balanced_accuracy": "", "sensitivity": "", "specificity": "", "precision": "", "precision_ppv": "", "f1": "", "brier_score": "", "mean_score": "", "tn": "", "fp": "", "fn": "", "tp": "", "cnn_phase_mode": "both"}, {"run_id": "tcn_attn_weight2_platt_thr045_ignore_both_phases_reuse_tcn", "run_name": "tcn_attn_weight2_platt_thr045_ignore_both_phases_reuse_tcn", "status": "completed", "updated_at": "2026-05-26T22:10:54Z", "output_dir": "/Users/thiagorodrigues/Desktop/obsidian/heart-research/experiments/nested_tcn_systole_cnn/tcn_attn_weight2_platt_thr045_ignore_both_phases_reuse_tcn", "summary_path": "/Users/thiagorodrigues/Desktop/obsidian/heart-research/experiments/nested_tcn_systole_cnn/tcn_attn_weight2_platt_thr045_ignore_both_phases_reuse_tcn/summary.md", "metrics_summary_path": "/Users/thiagorodrigues/Desktop/obsidian/heart-research/experiments/nested_tcn_systole_cnn/tcn_attn_weight2_platt_thr045_ignore_both_phases_reuse_tcn/metrics_summary.json", "tcn_target_mode": "cardiac-phase", "tcn_other_mode": "ignore", "tcn_systole_weight_multiplier": 2.0, "tcn_boundary_ignore_ms": 10.0, "cnn_epochs": 50, "cnn_inner_val_size": 0.15, "encoder_block": "residual", "pooling": "attention", "patient_mil_attention": false, "weak_murmur_weight": 1.0, "moderate_murmur_weight": 1.0, "decision_threshold": 0.5, "score_weights": "sensitivity=1,specificity=1,precision=1,f1=1", "error": "", "threshold": 0.5, "auroc": 0.8843776375547606, "auprc": 0.800473091097041, "balanced_accuracy": 0.8088300309473092, "sensitivity": 0.6536312849162011, "specificity": 0.9640287769784172, "precision": 0.823943661971831, "precision_ppv": 0.823943661971831, "f1": 0.7289719626168225, "brier_score": 0.0804210411045103, "mean_score": 0.7926439216208179, "tn": 670.0, "fp": 25.0, "fn": 62.0, "tp": 117.0, "cnn_phase_mode": "both"}, {"run_id": "tcn_attn_weight2_platt_thr045_ignore_diastole_only_reuse_tcn", "run_name": "tcn_attn_weight2_platt_thr045_ignore_diastole_only_reuse_tcn", "status": "completed", "updated_at": "2026-05-26T22:33:55Z", "output_dir": "/Users/thiagorodrigues/Desktop/obsidian/heart-research/experiments/nested_tcn_systole_cnn/tcn_attn_weight2_platt_thr045_ignore_diastole_only_reuse_tcn", "summary_path": "/Users/thiagorodrigues/Desktop/obsidian/heart-research/experiments/nested_tcn_systole_cnn/tcn_attn_weight2_platt_thr045_ignore_diastole_only_reuse_tcn/summary.md", "metrics_summary_path": "/Users/thiagorodrigues/Desktop/obsidian/heart-research/experiments/nested_tcn_systole_cnn/tcn_attn_weight2_platt_thr045_ignore_diastole_only_reuse_tcn/metrics_summary.json", "tcn_target_mode": "cardiac-phase", "tcn_other_mode": "ignore", "tcn_systole_weight_multiplier": 2.0, "tcn_boundary_ignore_ms": 10.0, "cnn_epochs": 50, "cnn_inner_val_size": 0.15, "encoder_block": "residual", "pooling": "attention", "patient_mil_attention": false, "weak_murmur_weight": 1.0, "moderate_murmur_weight": 1.0, "decision_threshold": 0.5, "score_weights": "sensitivity=1,specificity=1,precision=1,f1=1", "error": "", "threshold": 0.5, "auroc": 0.6697238856959126, "auprc": 0.381266802898715, "balanced_accuracy": 0.5667014991358869, "sensitivity": 0.1564245810055866, "specificity": 0.9769784172661872, "precision": 0.6363636363636364, "precision_ppv": 0.6363636363636364, "f1": 0.2511210762331838, "brier_score": 0.1507446491931345, "mean_score": 0.5052219277171485, "tn": 679.0, "fp": 16.0, "fn": 151.0, "tp": 28.0, "cnn_phase_mode": "diastole"}, {"run_id": "tcn_attn_weight2_platt_thr045_ignore_margin100_reuse_tcn", "run_name": "tcn_attn_weight2_platt_thr045_ignore_margin100_reuse_tcn", "status": "completed", "updated_at": "2026-05-27T01:45:42Z", "output_dir": "/Users/thiagorodrigues/Desktop/obsidian/heart-research/experiments/nested_tcn_systole_cnn/tcn_attn_weight2_platt_thr045_ignore_margin100_reuse_tcn", "summary_path": "/Users/thiagorodrigues/Desktop/obsidian/heart-research/experiments/nested_tcn_systole_cnn/tcn_attn_weight2_platt_thr045_ignore_margin100_reuse_tcn/summary.md", "metrics_summary_path": "/Users/thiagorodrigues/Desktop/obsidian/heart-research/experiments/nested_tcn_systole_cnn/tcn_attn_weight2_platt_thr045_ignore_margin100_reuse_tcn/metrics_summary.json", "tcn_target_mode": "cardiac-phase", "tcn_other_mode": "ignore", "tcn_systole_weight_multiplier": 2.0, "tcn_boundary_ignore_ms": 10.0, "cnn_epochs": 50, "cnn_inner_val_size": 0.15, "encoder_block": "residual", "pooling": "attention", "patient_mil_attention": false, "weak_murmur_weight": 1.0, "moderate_murmur_weight": 1.0, "decision_threshold": 0.5, "score_weights": "sensitivity=1,specificity=1,precision=1,f1=1", "error": "", "threshold": 0.5, "auroc": 0.910284956392428, "auprc": 0.8082303920799953, "balanced_accuracy": 0.8318958241228247, "sensitivity": 0.6983240223463687, "specificity": 0.9654676258992806, "precision": 0.8389261744966443, "precision_ppv": 0.8389261744966443, "f1": 0.7621951219512195, "brier_score": 0.0759897662117547, "mean_score": 0.8162282361733783, "tn": 671.0, "fp": 24.0, "fn": 54.0, "tp": 125.0, "cnn_phase_mode": "systole"}, {"run_id": "tcn_attn_weight2_platt_thr045_ignore_ltsrr_minority_reuse_tcn", "run_name": "tcn_attn_weight2_platt_thr045_ignore_ltsrr_minority_reuse_tcn", "status": "completed", "updated_at": "2026-05-27T02:27:31Z", "output_dir": "/Users/thiagorodrigues/Desktop/obsidian/heart-research/experiments/nested_tcn_systole_cnn/tcn_attn_weight2_platt_thr045_ignore_ltsrr_minority_reuse_tcn", "summary_path": "/Users/thiagorodrigues/Desktop/obsidian/heart-research/experiments/nested_tcn_systole_cnn/tcn_attn_weight2_platt_thr045_ignore_ltsrr_minority_reuse_tcn/summary.md", "metrics_summary_path": "/Users/thiagorodrigues/Desktop/obsidian/heart-research/experiments/nested_tcn_systole_cnn/tcn_attn_weight2_platt_thr045_ignore_ltsrr_minority_reuse_tcn/metrics_summary.json", "tcn_target_mode": "cardiac-phase", "tcn_other_mode": "ignore", "tcn_systole_weight_multiplier": 2.0, "tcn_boundary_ignore_ms": 10.0, "cnn_epochs": 50, "cnn_inner_val_size": 0.15, "encoder_block": "residual", "pooling": "attention", "patient_mil_attention": false, "weak_murmur_weight": 1.0, "moderate_murmur_weight": 1.0, "decision_threshold": 0.5, "score_weights": "sensitivity=1,specificity=1,precision=1,f1=1", "error": "", "threshold": 0.5, "auroc": 0.7923797275029139, "auprc": 0.658686075942121, "balanced_accuracy": 0.7271050198946988, "sensitivity": 0.4916201117318435, "specificity": 0.962589928057554, "precision": 0.7719298245614035, "precision_ppv": 0.7719298245614035, "f1": 0.6006825938566553, "brier_score": 0.1086198874220911, "mean_score": 0.7067056145518641, "tn": 669.0, "fp": 26.0, "fn": 91.0, "tp": 88.0, "cnn_phase_mode": "systole"}, {"run_id": "tcn_attn_weight2_platt_thr045_ignore_logmel_reuse_tcn", "run_name": "tcn_attn_weight2_platt_thr045_ignore_logmel_reuse_tcn", "status": "completed", "updated_at": "2026-05-27T02:40:27Z", "output_dir": "/Users/thiagorodrigues/Desktop/obsidian/heart-research/experiments/nested_tcn_systole_cnn/tcn_attn_weight2_platt_thr045_ignore_logmel_reuse_tcn", "summary_path": "/Users/thiagorodrigues/Desktop/obsidian/heart-research/experiments/nested_tcn_systole_cnn/tcn_attn_weight2_platt_thr045_ignore_logmel_reuse_tcn/summary.md", "metrics_summary_path": "/Users/thiagorodrigues/Desktop/obsidian/heart-research/experiments/nested_tcn_systole_cnn/tcn_attn_weight2_platt_thr045_ignore_logmel_reuse_tcn/metrics_summary.json", "tcn_target_mode": "cardiac-phase", "tcn_other_mode": "ignore", "tcn_systole_weight_multiplier": 2.0, "tcn_boundary_ignore_ms": 10.0, "cnn_epochs": 50, "cnn_inner_val_size": 0.15, "encoder_block": "residual", "pooling": "attention", "patient_mil_attention": false, "weak_murmur_weight": 1.0, "moderate_murmur_weight": 1.0, "decision_threshold": 0.5, "score_weights": "sensitivity=1,specificity=1,precision=1,f1=1", "error": "", "threshold": 0.5, "auroc": 0.8291547767372694, "auprc": 0.7246355188884354, "balanced_accuracy": 0.7745910534142518, "sensitivity": 0.5865921787709497, "specificity": 0.962589928057554, "precision": 0.8015267175572519, "precision_ppv": 0.8015267175572519, "f1": 0.6774193548387096, "brier_score": 0.097606739213335, "mean_score": 0.7570320448061163, "tn": 669.0, "fp": 26.0, "fn": 74.0, "tp": 105.0, "cnn_phase_mode": "systole"}, {"run_id": "tcn_attn_weight2_platt_thr045_ignore_smote_stft_reuse_tcn", "run_name": "tcn_attn_weight2_platt_thr045_ignore_smote_stft_reuse_tcn", "status": "completed", "updated_at": "2026-05-27T02:52:12Z", "output_dir": "/Users/thiagorodrigues/Desktop/obsidian/heart-research/experiments/nested_tcn_systole_cnn/tcn_attn_weight2_platt_thr045_ignore_smote_stft_reuse_tcn", "summary_path": "/Users/thiagorodrigues/Desktop/obsidian/heart-research/experiments/nested_tcn_systole_cnn/tcn_attn_weight2_platt_thr045_ignore_smote_stft_reuse_tcn/summary.md", "metrics_summary_path": "/Users/thiagorodrigues/Desktop/obsidian/heart-research/experiments/nested_tcn_systole_cnn/tcn_attn_weight2_platt_thr045_ignore_smote_stft_reuse_tcn/metrics_summary.json", "tcn_target_mode": "cardiac-phase", "tcn_other_mode": "ignore", "tcn_systole_weight_multiplier": 2.0, "tcn_boundary_ignore_ms": 10.0, "cnn_epochs": 50, "cnn_inner_val_size": 0.15, "encoder_block": "residual", "pooling": "attention", "patient_mil_attention": false, "weak_murmur_weight": 1.0, "moderate_murmur_weight": 1.0, "decision_threshold": 0.5, "score_weights": "sensitivity=1,specificity=1,precision=1,f1=1", "error": "", "threshold": 0.5, "auroc": 0.8904304489369398, "auprc": 0.8155076265395372, "balanced_accuracy": 0.8185643663839878, "sensitivity": 0.6759776536312849, "specificity": 0.9611510791366906, "precision": 0.8175675675675675, "precision_ppv": 0.8175675675675675, "f1": 0.7400611620795107, "brier_score": 0.0766864330690172, "mean_score": 0.7986893656037635, "tn": 668.0, "fp": 27.0, "fn": 58.0, "tp": 121.0, "cnn_phase_mode": "systole"}, {"run_id": "tcn_attn_weight2_platt_thr045_ignore_smote_logmel_reuse_tcn", "run_name": "tcn_attn_weight2_platt_thr045_ignore_smote_logmel_reuse_tcn", "status": "completed", "updated_at": "2026-05-27T03:00:16Z", "output_dir": "/Users/thiagorodrigues/Desktop/obsidian/heart-research/experiments/nested_tcn_systole_cnn/tcn_attn_weight2_platt_thr045_ignore_smote_logmel_reuse_tcn", "summary_path": "/Users/thiagorodrigues/Desktop/obsidian/heart-research/experiments/nested_tcn_systole_cnn/tcn_attn_weight2_platt_thr045_ignore_smote_logmel_reuse_tcn/summary.md", "metrics_summary_path": "/Users/thiagorodrigues/Desktop/obsidian/heart-research/experiments/nested_tcn_systole_cnn/tcn_attn_weight2_platt_thr045_ignore_smote_logmel_reuse_tcn/metrics_summary.json", "tcn_target_mode": "cardiac-phase", "tcn_other_mode": "ignore", "tcn_systole_weight_multiplier": 2.0, "tcn_boundary_ignore_ms": 10.0, "cnn_epochs": 50, "cnn_inner_val_size": 0.15, "encoder_block": "residual", "pooling": "attention", "patient_mil_attention": false, "weak_murmur_weight": 1.0, "moderate_murmur_weight": 1.0, "decision_threshold": 0.5, "score_weights": "sensitivity=1,specificity=1,precision=1,f1=1", "error": "", "threshold": 0.5, "auroc": 0.8492022024838229, "auprc": 0.7653260017138226, "balanced_accuracy": 0.7976568465897673, "sensitivity": 0.6312849162011173, "specificity": 0.9640287769784172, "precision": 0.8188405797101449, "precision_ppv": 0.8188405797101449, "f1": 0.7129337539432176, "brier_score": 0.0875680526616835, "mean_score": 0.7817720067082243, "tn": 670.0, "fp": 25.0, "fn": 66.0, "tp": 113.0, "cnn_phase_mode": "systole"}, {"run_id": "tcn_attn_weight2_platt_thr045_ignore_multiscale_reuse_tcn", "run_name": "tcn_attn_weight2_platt_thr045_ignore_multiscale_reuse_tcn", "status": "completed", "updated_at": "2026-05-27T03:26:15Z", "output_dir": "/Users/thiagorodrigues/Desktop/obsidian/heart-research/experiments/nested_tcn_systole_cnn/tcn_attn_weight2_platt_thr045_ignore_multiscale_reuse_tcn", "summary_path": "/Users/thiagorodrigues/Desktop/obsidian/heart-research/experiments/nested_tcn_systole_cnn/tcn_attn_weight2_platt_thr045_ignore_multiscale_reuse_tcn/summary.md", "metrics_summary_path": "/Users/thiagorodrigues/Desktop/obsidian/heart-research/experiments/nested_tcn_systole_cnn/tcn_attn_weight2_platt_thr045_ignore_multiscale_reuse_tcn/metrics_summary.json", "tcn_target_mode": "cardiac-phase", "tcn_other_mode": "ignore", "tcn_systole_weight_multiplier": 2.0, "tcn_boundary_ignore_ms": 10.0, "cnn_epochs": 50, "cnn_inner_val_size": 0.15, "encoder_block": "multiscale", "pooling": "attention", "patient_mil_attention": false, "weak_murmur_weight": 1.0, "moderate_murmur_weight": 1.0, "decision_threshold": 0.5, "score_weights": "sensitivity=1,specificity=1,precision=1,f1=1", "error": "", "threshold": 0.5, "auroc": 0.9007435392468148, "auprc": 0.8423602514726263, "balanced_accuracy": 0.8430690084803665, "sensitivity": 0.7206703910614525, "specificity": 0.9654676258992806, "precision": 0.8431372549019608, "precision_ppv": 0.8431372549019608, "f1": 0.7771084337349398, "brier_score": 0.0687808567226221, "mean_score": 0.8265959263994084, "tn": 671.0, "fp": 24.0, "fn": 50.0, "tp": 129.0, "cnn_phase_mode": "systole"}, {"run_id": "tcn_attn_weight2_platt_thr045_ignore_multiscale_logmel_reuse_tcn", "run_name": "tcn_attn_weight2_platt_thr045_ignore_multiscale_logmel_reuse_tcn", "status": "completed", "updated_at": "2026-05-27T13:01:04Z", "output_dir": "/Users/thiagorodrigues/Desktop/obsidian/heart-research/experiments/nested_tcn_systole_cnn/tcn_attn_weight2_platt_thr045_ignore_multiscale_logmel_reuse_tcn", "summary_path": "/Users/thiagorodrigues/Desktop/obsidian/heart-research/experiments/nested_tcn_systole_cnn/tcn_attn_weight2_platt_thr045_ignore_multiscale_logmel_reuse_tcn/summary.md", "metrics_summary_path": "/Users/thiagorodrigues/Desktop/obsidian/heart-research/experiments/nested_tcn_systole_cnn/tcn_attn_weight2_platt_thr045_ignore_multiscale_logmel_reuse_tcn/metrics_summary.json", "tcn_target_mode": "cardiac-phase", "tcn_other_mode": "ignore", "tcn_systole_weight_multiplier": 2.0, "tcn_boundary_ignore_ms": 10.0, "cnn_epochs": 50, "cnn_inner_val_size": 0.15, "encoder_block": "multiscale", "pooling": "attention", "patient_mil_attention": false, "weak_murmur_weight": 1.0, "moderate_murmur_weight": 1.0, "decision_threshold": 0.5, "score_weights": "sensitivity=1,specificity=1,precision=1,f1=1", "error": "", "threshold": 0.5, "auroc": 0.8665728869418432, "auprc": 0.7778293860234252, "balanced_accuracy": 0.7940597242876091, "sensitivity": 0.6312849162011173, "specificity": 0.9568345323741008, "precision": 0.7902097902097902, "precision_ppv": 0.7902097902097902, "f1": 0.701863354037267, "brier_score": 0.0870877949671427, "mean_score": 0.7700481482055689, "tn": 665.0, "fp": 30.0, "fn": 66.0, "tp": 113.0, "cnn_phase_mode": "systole"}, {"run_id": "tcn_attn_weight2_platt_thr045_ignore_multiscale_logmel_dilated32_reuse_tcn", "run_name": "tcn_attn_weight2_platt_thr045_ignore_multiscale_logmel_dilated32_reuse_tcn", "status": "completed", "updated_at": "2026-05-27T13:15:39Z", "output_dir": "/Users/thiagorodrigues/Desktop/obsidian/heart-research/experiments/nested_tcn_systole_cnn/tcn_attn_weight2_platt_thr045_ignore_multiscale_logmel_dilated32_reuse_tcn", "summary_path": "/Users/thiagorodrigues/Desktop/obsidian/heart-research/experiments/nested_tcn_systole_cnn/tcn_attn_weight2_platt_thr045_ignore_multiscale_logmel_dilated32_reuse_tcn/summary.md", "metrics_summary_path": "/Users/thiagorodrigues/Desktop/obsidian/heart-research/experiments/nested_tcn_systole_cnn/tcn_attn_weight2_platt_thr045_ignore_multiscale_logmel_dilated32_reuse_tcn/metrics_summary.json", "tcn_target_mode": "cardiac-phase", "tcn_other_mode": "ignore", "tcn_systole_weight_multiplier": 2.0, "tcn_boundary_ignore_ms": 10.0, "cnn_epochs": 50, "cnn_inner_val_size": 0.15, "encoder_block": "multiscale", "pooling": "attention", "patient_mil_attention": false, "weak_murmur_weight": 1.0, "moderate_murmur_weight": 1.0, "decision_threshold": 0.5, "score_weights": "sensitivity=1,specificity=1,precision=1,f1=1", "error": "", "threshold": 0.5, "auroc": 0.873284835818496, "auprc": 0.7776744096432413, "balanced_accuracy": 0.8149672440818295, "sensitivity": 0.6759776536312849, "specificity": 0.953956834532374, "precision": 0.7908496732026143, "precision_ppv": 0.7908496732026143, "f1": 0.7289156626506024, "brier_score": 0.0849511429997914, "mean_score": 0.787424956004219, "tn": 663.0, "fp": 32.0, "fn": 58.0, "tp": 121.0, "cnn_phase_mode": "systole"}, {"run_id": "tcn_attn_weight2_platt_thr045_ignore_multiscale_logmel_dilated32_focal_reuse_tcn", "run_name": "tcn_attn_weight2_platt_thr045_ignore_multiscale_logmel_dilated32_focal_reuse_tcn", "status": "completed", "updated_at": "2026-05-27T13:39:01Z", "output_dir": "/Users/thiagorodrigues/Desktop/obsidian/heart-research/experiments/nested_tcn_systole_cnn/tcn_attn_weight2_platt_thr045_ignore_multiscale_logmel_dilated32_focal_reuse_tcn", "summary_path": "/Users/thiagorodrigues/Desktop/obsidian/heart-research/experiments/nested_tcn_systole_cnn/tcn_attn_weight2_platt_thr045_ignore_multiscale_logmel_dilated32_focal_reuse_tcn/summary.md", "metrics_summary_path": "/Users/thiagorodrigues/Desktop/obsidian/heart-research/experiments/nested_tcn_systole_cnn/tcn_attn_weight2_platt_thr045_ignore_multiscale_logmel_dilated32_focal_reuse_tcn/metrics_summary.json", "tcn_target_mode": "cardiac-phase", "tcn_other_mode": "ignore", "tcn_systole_weight_multiplier": 2.0, "tcn_boundary_ignore_ms": 10.0, "cnn_epochs": 50, "cnn_inner_val_size": 0.15, "encoder_block": "multiscale", "pooling": "attention", "patient_mil_attention": false, "weak_murmur_weight": 1.0, "moderate_murmur_weight": 1.0, "decision_threshold": 0.5, "score_weights": "sensitivity=1,specificity=1,precision=1,f1=1", "error": "", "threshold": 0.5, "auroc": 0.8447329287408062, "auprc": 0.7286335410415841, "balanced_accuracy": 0.7885575338611792, "sensitivity": 0.6145251396648045, "specificity": 0.962589928057554, "precision": 0.8088235294117647, "precision_ppv": 0.8088235294117647, "f1": 0.6984126984126985, "brier_score": 0.0917065599058945, "mean_score": 0.7710878238867054, "tn": 669.0, "fp": 26.0, "fn": 69.0, "tp": 110.0, "cnn_phase_mode": "systole"}, {"run_id": "tcn_attn_weight2_platt_thr045_ignore_multiscale_stft_dilated32_focal_reuse_tcn", "run_name": "tcn_attn_weight2_platt_thr045_ignore_multiscale_stft_dilated32_focal_reuse_tcn", "status": "completed", "updated_at": "2026-05-27T13:54:02Z", "output_dir": "/Users/thiagorodrigues/Desktop/obsidian/heart-research/experiments/nested_tcn_systole_cnn/tcn_attn_weight2_platt_thr045_ignore_multiscale_stft_dilated32_focal_reuse_tcn", "summary_path": "/Users/thiagorodrigues/Desktop/obsidian/heart-research/experiments/nested_tcn_systole_cnn/tcn_attn_weight2_platt_thr045_ignore_multiscale_stft_dilated32_focal_reuse_tcn/summary.md", "metrics_summary_path": "/Users/thiagorodrigues/Desktop/obsidian/heart-research/experiments/nested_tcn_systole_cnn/tcn_attn_weight2_platt_thr045_ignore_multiscale_stft_dilated32_focal_reuse_tcn/metrics_summary.json", "tcn_target_mode": "cardiac-phase", "tcn_other_mode": "ignore", "tcn_systole_weight_multiplier": 2.0, "tcn_boundary_ignore_ms": 10.0, "cnn_epochs": 50, "cnn_inner_val_size": 0.15, "encoder_block": "multiscale", "pooling": "attention", "patient_mil_attention": false, "weak_murmur_weight": 1.0, "moderate_murmur_weight": 1.0, "decision_threshold": 0.5, "score_weights": "sensitivity=1,specificity=1,precision=1,f1=1", "error": "", "threshold": 0.5, "auroc": 0.9110083999839236, "auprc": 0.8430509163320455, "balanced_accuracy": 0.8367629918411639, "sensitivity": 0.7094972067039106, "specificity": 0.9640287769784172, "precision": 0.8355263157894737, "precision_ppv": 0.8355263157894737, "f1": 0.7673716012084593, "brier_score": 0.0708186052028039, "mean_score": 0.8191059751700652, "tn": 670.0, "fp": 25.0, "fn": 52.0, "tp": 127.0, "cnn_phase_mode": "systole"}, {"run_id": "tcn_attn_weight2_platt_thr045_ignore_multiscale_stft_dilated32_bce_auc01_reuse_tcn", "run_name": "tcn_attn_weight2_platt_thr045_ignore_multiscale_stft_dilated32_bce_auc01_reuse_tcn", "status": "completed", "updated_at": "2026-05-27T14:06:43Z", "output_dir": "/Users/thiagorodrigues/Desktop/obsidian/heart-research/experiments/nested_tcn_systole_cnn/tcn_attn_weight2_platt_thr045_ignore_multiscale_stft_dilated32_bce_auc01_reuse_tcn", "summary_path": "/Users/thiagorodrigues/Desktop/obsidian/heart-research/experiments/nested_tcn_systole_cnn/tcn_attn_weight2_platt_thr045_ignore_multiscale_stft_dilated32_bce_auc01_reuse_tcn/summary.md", "metrics_summary_path": "/Users/thiagorodrigues/Desktop/obsidian/heart-research/experiments/nested_tcn_systole_cnn/tcn_attn_weight2_platt_thr045_ignore_multiscale_stft_dilated32_bce_auc01_reuse_tcn/metrics_summary.json", "tcn_target_mode": "cardiac-phase", "tcn_other_mode": "ignore", "tcn_systole_weight_multiplier": 2.0, "tcn_boundary_ignore_ms": 10.0, "cnn_epochs": 50, "cnn_inner_val_size": 0.15, "encoder_block": "multiscale", "pooling": "attention", "patient_mil_attention": false, "weak_murmur_weight": 1.0, "moderate_murmur_weight": 1.0, "decision_threshold": 0.5, "score_weights": "sensitivity=1,specificity=1,precision=1,f1=1", "error": "", "threshold": 0.5, "auroc": 0.9071419959004864, "auprc": 0.8320043066585482, "balanced_accuracy": 0.8492906233672279, "sensitivity": 0.7374301675977654, "specificity": 0.9611510791366906, "precision": 0.8301886792452831, "precision_ppv": 0.8301886792452831, "f1": 0.7810650887573964, "brier_score": 0.071917282299673, "mean_score": 0.8274587536842838, "tn": 668.0, "fp": 27.0, "fn": 47.0, "tp": 132.0, "cnn_phase_mode": "systole"}];
+    const columns = ["run_name", "status", "mean_score", "sensitivity", "specificity", "precision_ppv", "f1", "balanced_accuracy", "auroc", "auprc", "tp", "fp", "tn", "fn", "tcn_systole_weight_multiplier", "cnn_phase_mode", "encoder_block", "patient_mil_attention", "updated_at"];
+    let sortKey = "mean_score";
+    let sortDirection = -1;
+
+    function numericValue(value) {
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? parsed : null;
+    }
+
+    function formatValue(key, value) {
+      const numeric = numericValue(value);
+      if (numeric !== null && ["mean_score", "sensitivity", "specificity", "precision_ppv", "f1", "balanced_accuracy", "auroc", "auprc"].includes(key)) {
+        return numeric.toFixed(3);
+      }
+      return String(value ?? "");
+    }
+
+    function filteredRows() {
+      const query = document.getElementById("search").value.toLowerCase();
+      const status = document.getElementById("status").value;
+      return rows.filter(row => {
+        if (status && row.status !== status) return false;
+        if (!query) return true;
+        return JSON.stringify(row).toLowerCase().includes(query);
+      }).sort((a, b) => {
+        const av = numericValue(a[sortKey]);
+        const bv = numericValue(b[sortKey]);
+        if (av !== null && bv !== null) return (av - bv) * sortDirection;
+        return String(a[sortKey] ?? "").localeCompare(String(b[sortKey] ?? "")) * sortDirection;
+      });
+    }
+
+    function renderMetrics(currentRows) {
+      const completed = currentRows.filter(row => row.status === "completed");
+      const best = completed.reduce((acc, row) => {
+        const score = numericValue(row.mean_score) ?? -1;
+        return score > acc.score ? { row, score } : acc;
+      }, { row: null, score: -1 }).row;
+      const metrics = [
+        ["Experimentos", currentRows.length],
+        ["Completos", completed.length],
+        ["Melhor score", best ? formatValue("mean_score", best.mean_score) : "-"],
+        ["Melhor run", best ? best.run_name : "-"],
+      ];
+      document.getElementById("metrics").innerHTML = metrics.map(([label, value]) => `
+        <div class="metric"><div class="metric-label">${label}</div><div class="metric-value">${value}</div></div>
+      `).join("");
+    }
+
+    function renderTable() {
+      const currentRows = filteredRows();
+      renderMetrics(currentRows);
+      const bestScore = Math.max(...currentRows.filter(row => row.status === "completed").map(row => numericValue(row.mean_score) ?? -1));
+      const head = `<thead><tr>${columns.map(column => `<th data-key="${column}">${column}</th>`).join("")}<th>links</th></tr></thead>`;
+      const body = currentRows.map(row => {
+        const isBest = row.status === "completed" && (numericValue(row.mean_score) ?? -2) === bestScore;
+        const statusClass = row.status === "failed" ? "status-failed" : "";
+        const cells = columns.map(column => `<td class="${column === "status" ? statusClass : ""}">${formatValue(column, row[column])}</td>`).join("");
+        const links = `<td><a href="${row.summary_path || ""}">summary</a> · <a href="${row.output_dir || ""}">pasta</a></td>`;
+        return `<tr class="${isBest ? "best" : ""}">${cells}${links}</tr>`;
+      }).join("");
+      document.getElementById("experiments").innerHTML = `${head}<tbody>${body}</tbody>`;
+      document.querySelectorAll("th[data-key]").forEach(th => {
+        th.addEventListener("click", () => {
+          const key = th.dataset.key;
+          if (sortKey === key) sortDirection *= -1;
+          else {
+            sortKey = key;
+            sortDirection = -1;
+          }
+          renderTable();
+        });
+      });
+    }
+
+    document.getElementById("search").addEventListener("input", renderTable);
+    document.getElementById("status").addEventListener("change", renderTable);
+    renderTable();
+  </script>
+</body>
+</html>

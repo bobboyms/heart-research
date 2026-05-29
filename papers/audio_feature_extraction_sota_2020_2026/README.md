@@ -1,0 +1,20 @@
+# Papers sobre extracao moderna de caracteristicas de audio (2020-2026)
+
+Curadoria de papers recentes sobre features tradicionais/avancadas, embeddings aprendidos, self-supervised learning, Transformers, CNNs, contrastive learning e modelos multimodais para audio.
+
+| Ano | Paper | Foco principal | PDF local | Fonte |
+| --- | --- | --- | --- | --- |
+| 2020 | PANNs: Large-Scale Pretrained Audio Neural Networks for Audio Pattern Recognition | CNNs pre-treinadas em AudioSet; embeddings a partir de log-mel spectrograms para reconhecimento geral de audio | `2020_PANNs_large_scale_pretrained_audio_neural_networks.pdf` | https://arxiv.org/abs/1912.10211 |
+| 2020 | wav2vec 2.0: A Framework for Self-Supervised Learning of Speech Representations | Representacoes SSL a partir de waveform cru, quantizacao latente e objetivo contrastivo | `2020_wav2vec2_self_supervised_speech_representations.pdf` | https://arxiv.org/abs/2006.11477 |
+| 2020 | Contrastive Learning of General-Purpose Audio Representations | COLA; embeddings gerais de audio por contrastive learning | `2020_COLA_contrastive_general_purpose_audio_representations.pdf` | https://arxiv.org/abs/2010.10915 |
+| 2021 | BYOL for Audio: Self-Supervised Learning for General-Purpose Audio Representation | BYOL-A; representacoes gerais por pares aumentados sem negativos explicitos | `2021_BYOL_A_self_supervised_general_purpose_audio_representation.pdf` | https://arxiv.org/abs/2103.06695 |
+| 2021 | AST: Audio Spectrogram Transformer | Transformer puro aplicado a audio spectrograms para classificacao | `2021_AST_audio_spectrogram_transformer.pdf` | https://arxiv.org/abs/2104.01778 |
+| 2021 | Efficient Training of Audio Transformers with Patchout | PaSST; treinamento eficiente de Transformers em espectrogramas com patchout | `2021_PaSST_efficient_training_audio_transformers_patchout.pdf` | https://arxiv.org/abs/2110.05069 |
+| 2022 | HTS-AT: A Hierarchical Token-Semantic Audio Transformer for Sound Classification and Detection | Transformer hierarquico com token-semantic module para classificacao e deteccao/localizacao | `2022_HTS_AT_hierarchical_token_semantic_audio_transformer.pdf` | https://arxiv.org/abs/2202.00874 |
+| 2022 | CLAP: Learning Audio Concepts From Natural Language Supervision | Audio-language contrastive learning; embeddings multimodais audio-texto | `2022_CLAP_learning_audio_concepts_natural_language_supervision.pdf` | https://arxiv.org/abs/2206.04769 |
+| 2022 | Masked Autoencoders that Listen | AudioMAE; masked autoencoding sobre patches de espectrograma | `2022_AudioMAE_masked_autoencoders_that_listen.pdf` | https://arxiv.org/abs/2207.06405 |
+| 2023 | BEATs: Audio Pre-Training with Acoustic Tokenizers | Pre-treinamento SSL com acoustic tokenizers e Audio Transformers | `2023_BEATs_audio_pretraining_with_acoustic_tokenizers.pdf` | https://arxiv.org/abs/2212.09058 |
+| 2025 | Transformation of Audio Embeddings into Interpretable, Concept-Based Representations | Transformacao post-hoc de embeddings CLAP em representacoes esparsas e semanticamente interpretaveis | `2025_audio_embeddings_interpretable_concept_based_representations.pdf` | https://arxiv.org/abs/2504.14076 |
+| 2025 | General-Purpose Audio Representation Learning for Real-World Sound Scenes | GRAM; aprendizado SSL robusto para cenas sonoras naturalisticas, espaciais e ruidosas | `2025_GRAM_general_purpose_audio_representation_real_world_sound_scenes.pdf` | https://arxiv.org/abs/2506.00934 |
+| 2025 | WavJEPA: Semantic Learning Unlocks Robust Audio Foundation Models for Raw Waveforms | JEPA em waveform cru para foundation models de audio robustos e de baixa latencia | `2025_WavJEPA_semantic_learning_robust_audio_foundation_models_raw_waveforms.pdf` | https://arxiv.org/abs/2509.23238 |
+| 2026 | AudioMosaic: Contrastive Masked Audio Representation Learning | Contrastive masked learning com mascaramento tempo-frequencia estruturado para representacoes discriminativas | `2026_AudioMosaic_contrastive_masked_audio_representation_learning.pdf` | https://arxiv.org/abs/2605.14231 |

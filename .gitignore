@@ -1,0 +1,48 @@
+# Ambientes Python
+.venv/
+__pycache__/
+*.py[cod]
+
+# Segredos — NUNCA commitar
+.env
+**/.env
+scripts/.env
+*.key
+*.pem
+
+# Caches
+.cache/
+.DS_Store
+
+# Dataset CirCor (baixar do PhysioNet)
+circor-heart-sound-1.0.3/training_data/
+circor-heart-sound-1.0.3/training_data.csv
+
+# Outputs de experimentos (pesado, regenerável)
+**/outputs/
+**/outputs_*/
+!**/outputs/summary.md
+!**/outputs/interpretacao_resultados.md
+
+# Runs com timestamp em experiments/
+experiments/nested_tcn_systole_cnn/*/
+!experiments/nested_tcn_systole_cnn/*.md
+!experiments/nested_tcn_systole_cnn/*.csv
+!experiments/nested_tcn_systole_cnn/*.jsonl
+
+# PDFs de papers (manter só os .md convertidos)
+papers/**/*.pdf
+papers/**/_assets/
+Busca de papers sobre murmúrio.pdf
+
+# Artefatos binários de treino
+*.pt
+*.pth
+*.ckpt
+*.npz
+*.npy
+*.h5
+*.joblib
+*.pkl
+*.parquet
+*.wav
