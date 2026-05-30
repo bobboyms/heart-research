@@ -51,6 +51,7 @@ def make_cnn_args(args: argparse.Namespace, fold_dir: Path) -> argparse.Namespac
         smote_target_ratio=args.smote_target_ratio,
         freq_norm=getattr(args, "freq_norm", "perbin"),
         aux_pitch_loss_weight=getattr(args, "aux_pitch_loss_weight", 0.0),
+        init_encoder=getattr(args, "init_encoder", None),
         loss=args.loss,
         focal_gamma=args.focal_gamma,
         focal_alpha=args.focal_alpha,

@@ -147,6 +147,17 @@ def train_one_fold(
                                       demo_features=None if demo_all is None else demo_all[selection_indices])
     loader = build_train_loader(train_ds, train_labels, args)
     model = build_systole_model(model_config).to(device)
+    init_encoder = getattr(args, "init_encoder", None)
+    if init_encoder:
+        # Transfer learning: load matching encoder+pool weights from a pretrained checkpoint
+        # (e.g. PhysioNet 2016). The classification head stays randomly initialized.
+        ckpt = torch.load(init_encoder, map_location="cpu", weights_only=False)
+        pretrained = ckpt.get("model_state", ckpt) if isinstance(ckpt, dict) else ckpt
+        own = model.state_dict()
+        loadable = {k: v for k, v in pretrained.items()
+                    if k in own and own[k].shape == v.shape and (k.startswith("encoder.") or k.startswith("pool."))}
+        missing = model.load_state_dict({**own, **loadable}, strict=False)
+        print(f"Fold {fold}: init encoder from {init_encoder} ({len(loadable)} tensors loaded)", flush=True)
     pos = float((train_labels == 1).sum())
     neg = float((train_labels == 0).sum())
     loss_fn = build_binary_loss(args, pos, neg, device)

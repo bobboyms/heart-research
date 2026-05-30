@@ -256,6 +256,16 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
+        "--init-encoder",
+        type=str,
+        default=None,
+        help=(
+            "Path to a pretrained checkpoint (e.g. from scripts/pretrain_physionet2016.py). Loads the "
+            "matching encoder+pool weights into the CNN before fine-tuning (transfer learning). The "
+            "classification head stays randomly initialized. Architecture/freq-bins must match."
+        ),
+    )
+    parser.add_argument(
         "--target",
         choices=["murmur", "outcome"],
         default="murmur",

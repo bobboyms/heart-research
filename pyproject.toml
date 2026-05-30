@@ -5,6 +5,7 @@ description = "Research vault utilities for heart sound papers and CirCor featur
 readme = "AGENTS.md"
 requires-python = ">=3.11"
 dependencies = [
+    "kymatio>=0.3.0",
     "matplotlib>=3.8",
     "numpy>=1.26",
     "pandas>=2.2",

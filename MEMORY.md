@@ -27,7 +27,9 @@
 `bc_locaware_perseg_focalfix_perfreqnorm` — AUPRC 0.8459 · AUROC 0.9115 · std-fold 0.064. Receita: labels **location-aware** · **STFT per-segment** · encoder `multiscale` `--dilations 1,2,4,8,16,32` pooling `attention` · loss `focal` γ=2 sem pos_weight · norma por bin · sístole via TCN `--systole-threshold 0.45 --systole-margin-ms 50`.
 
 ## ★ Achado central — o teto ~0.85 são os sopros suaves (I/VI)
-Experimento `floor_audible_only_gt_systole`: excluindo os 104 sopros **I/VI** (de 179 Present), mantendo só Absent + audíveis (II/VI=28, III/VI=46), o **AUROC sobe de 0.90 → 0.955** (4/5 folds em 0.98-0.999). Os audíveis (II/VI+) já são detectados quase perfeitamente; **os I/VI seguram o teto**.
+Experimento `floor_audible_only_gt_systole` (sobre bc/GT): excluindo os 104 sopros **I/VI** (de 179 Present), mantendo só Absent + audíveis (II/VI=28, III/VI=46), o **AUROC sobe de 0.90 → 0.955** (4/5 folds em 0.98-0.999). Os audíveis (II/VI+) já são detectados quase perfeitamente; **os I/VI seguram o teto**.
+
+**Quebra por grading DIRETO no melhor modelo (`lb300`)** — confirma e quantifica: prob.cal média e FN@0.5 crescem monotonicamente com a intensidade. I/VI: n=104, prob 0.59, **FN 40 (38%)**; II/VI: n=28, prob 0.80, FN 3 (11%); III/VI: n=46, prob 0.98, **FN 0 (0%)**. **91% dos falsos-negativos são I/VI (40 de 44).** Removendo os I/VI dos positivos, o `lb300` fica quase perfeito: **AUROC 0.9375→0.9932, AUPRC 0.8844→0.9617**. (Vai no paper, Tabela 3 — `paper.md`.)
 
 **Nuance importante (não simplificar):** I/VI **É audível** para um cardiologista ao vivo (por isso está rotulado Present). O que ocorre é que **o modelo não consegue separá-lo do normal NESTAS gravações**. Causas possíveis, **não distinguíveis só com os dados**:
 1. sinal fraco/mascarado por ruído, ou não capturado no clipe (exame ao vivo usa manobras/posições/tempo que a gravação fixa não tem);
@@ -85,6 +87,14 @@ Análise das predições por gravação (`Grupo I .../recording_oof_predictions.
 ## Comparação com paper "SMOTE+RNN" (98.6%) — NÃO comparável
 `1617/1546` deles bate com o rótulo **Outcome (Normal/Abnormal, ~balanceado)**, não Murmur (~20%). Reportam **accuracy por SEGMENTO** (balanceado via SMOTE), não AUPRC paciente-level. AUROC paciente-level do `bc` (0.91) está no nível do SOTA honesto do CirCor.
 
+## Comparação com a literatura 2020–2026 (CirCor / PhysioNet 2022) — nosso AUROC 0.9375 está no SOTA honesto, provavelmente acima
+Tabela completa + fontes em `papers/comparacao_sota_murmur_detection.md` (gerada 2026-05-29). **Única métrica comparável entre trabalhos = AUROC.** Nosso `lb300` = AUROC **0.9375** / AUPRC **0.8844**, paciente-level nested CV sem vazamento. Pontos:
+- **WST+1D-CNN (arXiv 2303.11423, 2023): AUROC 0.9345** — empate aparente, MAS é **segment-level com split 80-20 por segmento (sem separação por paciente → vazamento provável)**. Sob protocolo rigoroso, a igualdade **favorece o nosso**.
+- **Vencedor do Challenge 2022 (HearHeart): AUROC 0.884 / W.Acc 0.780** (3-classe, test oculto, otimiza weighted-accuracy). Nenhum time do top-5 passa de AUROC 0.884. Nosso 0.9375 > todos, com a ressalva de que nossa task é binária (sem Unknown), um pouco mais fácil.
+- 2025: uncertainty-aware (arXiv 2511.00966) só reporta Acc 91%; training-free transformer (arXiv 2509.18424) W.Acc 0.786 / UAR 0.697 — não dá p/ comparar por AUROC.
+- Somos dos poucos a reportar **AUPRC** (prevalência ~20% → métrica honesta que a maioria omite).
+- **2ª busca (confirma): somos o único protocolo rigoroso para a task.** Todo número ≥ ao nosso cai em 3 armadilhas: (1) **SMOTE/balanceamento que infla** — Stockwell+AlexNet (Sci Rep 2024, PMC10981708): "AUC" 0.98 / W.Acc 0.93, paciente-level, MAS usa SMOTE+up/down-sampling e W.Acc 0.93 >> vencedor do Challenge 0.78 na MESMA métrica = artefato de reamostragem; (2) **task diferente** — EHST (Sci Rep 2025) é caracterização timing/shape/pitch, não present-vs-absent; grading I–VI (PMC10482086); (3) **só W.Acc sem AUROC** (Challenge). O WST+1D-CNN segue como **único paper com a task exata + AUROC sem balanceamento — e é segment-level com vazamento**. **Não há benchmark paciente-level, sem vazamento, sem SMOTE, com AUROC/AUPRC binário além do nosso.**
+
 ## Caminhos com fundamento (ainda não esgotados) — alavancas de DADOS, não arquitetura
 1. **Supervisão auxiliar (multi-task):** prever `grading`/`timing`/`shape` junto — sinal mais rico p/ a classe difícil (usa rótulos que já existem).
 2. **Demografia como entrada:** `Age/Sex/Height/Weight/Pregnancy` (não depende de segmentação).
@@ -128,8 +138,27 @@ Análise das predições por gravação (`Grupo I .../recording_oof_predictions.
 | phase_contrast_lb300 + n_fft 256 (vs 128) | TCN | 0.8750 | 0.9315 | **resolução de freq maior NÃO transfere** (−0.009; low-pitch 0.498→0.449): janela maior piora resolução temporal; sinal está na textura temporal |
 | phase_contrast_lb300 + demografia (ramo somado) | TCN | 0.8759 | 0.9322 | **demografia NÃO ajuda o Murmur** (−0.009): sinal fraco (Age fraco, Sex ~0). Ramo implementado/reutilizável |
 | **reframe `Outcome`** (Normal/Abnormal, GT seg, phase-contrast+lb300) | 0.7106 | 0.6764 | **DESCARTADO pelo usuário**: teto acústico baixo (AUROC 0.68 vs Murmur 0.94) — pipeline é especializado em **evento acústico** (sopro); 263 Abnormal sem sopro não têm assinatura. Demografia ajudava aqui (AUROC ~0.71, 2 folds) mas Outcome **não é o caminho** |
+| phase_contrast_lb300 + **transfer PhysioNet 2016** (`--init-encoder`) | TCN | 0.8772 | 0.9406 | **WASH** (AUPRC −0.007, AUROC +0.003): encoder pré-treinou bem no PhysioNet (val AUROC **0.949**, 2873 gravações, seg. Springer) mas não sobe o teto do murmur. **Evidência FRACA de que não é falta-de-dados-no-encoder** (confundida por domain shift adulto→pediátrico e rótulo Normal/Abnormal≠murmur). NÃO prova "não é dados/representação" em geral — o phase-contrast (representação) subiu o teto recentemente; não testamos corpus pediátrico/rotulado-murmur nem gravações melhores |
 | feature_b3_systole_diastole_contrast_cluster | GT `.tsv` | — | — | exploratorio nao supervisionado: contraste puro sístole−diástole gerou cluster paciente 7/7 Present (100%, captura 3.9%); visualmente limpo, mas estreito; nao altera melhor modelo |
 | feature_b31_robust_cycle_contrast_cluster | GT `.tsv` | — | — | exploratorio nao supervisionado: z-contraste por ciclo + bandas; low k=10 clusters enriquecidos 109 pacientes/95 Present (87.2%, captura 53.1%); low k=2 69 pacientes/97.1%; melhor cluster exploratorio, sem AUPRC/AUROC |
 | feature_b32_enhanced_murmur_map_cluster | GT `.tsv` | — | — | exploratorio nao supervisionado: corte central + mapa positivo suavizado/thresholdado; low k=10 clusters 101 pacientes/98 Present (97.0%, captura 54.7%); low k=2 85/84 Present (98.8%); melhora v3.1, sem AUPRC/AUROC |
 | feature_b32_cluster_optimization_focused | GT `.tsv` | — | — | exploratorio nao supervisionado sobre features ja extraidas: melhor amplo `low_persistence`+standard+PCA50+k10 = 105 pacientes/102 Present (97.1%, captura 57.0%); PCA2+k9 = 101/99 (98.0%, captura 55.3%); cluster unico PCA2+k2 = 85/85 (100%, captura 47.5%); sem AUPRC/AUROC |
 | feature_b33_lowband_texture_separability | GT `.tsv` | — | — | exploratorio: textura na banda baixa (<=260 Hz) + camada de separabilidade Present×Absent. **Feature individual mais forte = NOVA: `tex_gini_map` (AUC 0.864, d=-1.53)** → sopro = Gini BAIXO = energia espalhada/sustentada (vs normal concentrado/transiente); bate a melhor do v3.2 (energia low-mid 0.834). Textura ADICIONA pouco no multivariado (Mahalanobis combinado 3.02 vs v3.2 2.84; AUC dist-ao-Absent 0.851 vs 0.838, nivel gravacao). **Score `dist_to_absent` (Mahalanobis ao centroide Absent) ordena por grading**: Absent 20.8 < II/VI 37.9 ~ I/VI 49.8 << III/VI 181.2 — reproduz quantitativamente o achado central (suaves colados no normal). RESSALVA: metricas in-sample, sem CV; `dist_to_absent_auc=1.0` paciente e artefato p>>n (ignorar). AUC por feature = leitura robusta. Sem AUPRC/AUROC supervisionado. |
+
+## Tarefa NOVA — graduar a INTENSIDADE do sopro (`scripts/grade_murmur_ordinal.py`)
+Modelo à parte do Present/Absent. Reusa `SystoleDilatedCNN` + entrada phase-contrast lowband (≤300 Hz), GT seg, 5-fold por paciente. **Não comparável ao lb300 (alvo diferente).**
+- **Ordinal I/II/III (só Present, n=178):** CNN MAE 0.52 / within-1 94% / exato 63%; RNN (biGRU) MAE 0.53 / Spearman 0.61 / within-1 96%. **Confusão concentrada em I↔II** (acusticamente quase iguais); III/VI separa bem. RNN ordena um pouco melhor mas "hedge ao meio".
+- **★ Forte (III) vs fraco (I+II), binário, CNN: AUPRC 0.70 · AUROC 0.92.** É a distinção que o sinal suporta — "alto vs fraco" é separável e útil; graduação fina de 3 níveis não (limite informacional I↔II + II/VI=28).
+- **Ordinal 3 níveis Ausente<fraco(I/II)<forte(III), n=873:** MAE 0.13, Spearman 0.61, **within-1=100%** (extremos Ausente↔forte NUNCA trocados), Ausente 99.4%, forte 0/46 perdido como Ausente. Ponto cego: **fraco→Ausente 45%** (= piso dos I/VI). Acurácia 89.7% é inflada pelo desbalanço (trivial "sempre Ausente"=79.6%). Conservador (prior Absent puxa faint p/ Ausente).
+- Bug corrigido no refactor binário: init do "melhor época" do ordinal (era `1e9`, deve ser `-1e9`) — causou o NaN do B2/transfer-ordinal (NÃO foi instabilidade do transfer; nunca testado justo).
+
+## "Extrair mais do áudio" — AVENIDA ESGOTADA (probes de feature, fusão tardia com lb300)
+Testadas várias representações independentes do MESMO áudio; **todas redundantes com o lb300** (CNN-na-phase-contrast-lowband já extrai o sinal acessível):
+| Representação | sozinha (AUROC) | fusão tardia c/ lb300 (0.884/0.938) |
+|---|---|---|
+| energia ≤300Hz (mean) | 0.758 | — |
+| **consistência ciclo-a-ciclo (p25/median do excesso)** | **0.852** (median 0.843) | ❌ wash (0.8831/0.9371) |
+| WST (wavelet scattering, kymatio) | 0.809 | ❌ wash/pior (0.8702/0.9289) |
+- Consistência: **ótimo feature de INTERPRETABILIDADE** — p25 do excesso por ciclo separa o faint do normal (Absent 0.57 < I/VI 1.16 < II/VI 1.53 < III/VI 15.35), o que o `mean` não faz (mean: I/VI 2.58 ≈ Absent 1.61). Mas o lb300 **já capta** → não soma.
+- **Conclusão (calibrada, agora bem suportada):** o teto do faint **não é falta de representação/features** — 4+ representações independentes (energia, consistência, WST, transfer) não adicionam nada. É **informacional DADAS ESTAS GRAVAÇÕES**. NÃO testado (e única via plausível de info nova): gravações melhores/denoising, dado externo pediátrico-rotulado-murmur. Não re-testar features de áudio sobre a STFT — esgotado.
+- Infra: `kymatio` adicionado (precisa monkeypatch `scipy.special.sph_harm` p/ scipy novo); `scripts/probe_wst.py`.

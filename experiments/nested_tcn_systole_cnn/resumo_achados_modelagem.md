@@ -288,7 +288,38 @@ AUROC 0.6764** — muito abaixo do Murmur (0.94). Demografia ajudava (AUROC ~0.7
 usuário: não é o caminho** — todo o pipeline foi otimizado para o **evento acústico** (sopro), e o Outcome
 mistura anormalidades sem assinatura no PCG (263 Abnormal sem sopro = piso de outro tipo). Código `--target`/
 `--demographic` fica disponível (default murmur, backward-compat), mas o foco permanece no Murmur acústico.
-**Melhor modelo segue `lb300` (0.8844).** A avenida phase-contrast+low-band está
+**Melhor modelo segue `lb300` (0.8844).**
+
+### Transfer PhysioNet 2016 (`--init-encoder`) — POC passou, fine-tune é WASH
+POC (`scripts/pretrain_physionet2016.py`): pré-treinar o encoder do `SystoleDilatedCNN` no PhysioNet/CinC
+2016 (Normal/Abnormal, 2873 gravações, segmentação Springer nativa @2000Hz, MESMA representação
+phase-contrast lowband ≤300Hz). **Encoder aprende muito bem: val AUROC 0.949** (nível do desafio 2016) →
+a representação phase-contrast lowband é boa para PCG em geral. Fine-tune no CirCor-murmur via
+`--init-encoder` (carrega encoder+pool, head fresh; reusa TCN do bc): AUPRC **0.8772** / AUROC 0.9406 —
+**WASH** vs lb300 scratch (−0.007 / +0.003, dentro do ruído). `29045` 0.909→0.846 (ainda TP), 50277→0.951.
+**Conclusão (calibrada — ver crítica do usuário):** este corpus externo (adulto, Normal/Abnormal) não
+ajudou — evidência **fraca** contra falta-de-dados-no-encoder, **confundida** por domain shift
+adulto→pediátrico e rótulo ≠ murmur. **NÃO prova "não é dados/representação" em geral**: o phase-contrast
+(mudança de representação) subiu o teto há pouco, e não testamos corpus pediátrico, rotulado-por-murmur,
+nem gravações melhores. O componente informacional dos I/VI é forte (ver "what makes I/VI hard": ~68% dos
+I/VI têm excesso sistólico dentro da faixa dos Absent) mas **não provadamente irredutível**.
+
+## Grading de intensidade (tarefa NOVA, à parte) + esgotamento da avenida "features de áudio"
+
+**Modelo de intensidade** (`scripts/grade_murmur_ordinal.py`, mesma CNN+entrada do lb300, GT seg, 5-fold paciente):
+- Ordinal I/II/III (só Present): CNN MAE 0.52 / within-1 94%; RNN biGRU MAE 0.53 / Spearman 0.61. I↔II inseparável.
+- **Forte(III) vs fraco(I+II): AUROC 0.92 / AUPRC 0.70** — a distinção que o sinal suporta (produto útil).
+- Ordinal Ausente<fraco<forte (n=873): within-1=**100%** (extremos nunca trocados), Ausente 99.4%, forte nunca perdido; fraco→Ausente 45% (= piso I/VI). Acurácia 89.7% inflada pelo desbalanço (trivial 79.6%).
+
+**Avenida "extrair mais do áudio" — ESGOTADA.** Probes de feature + fusão tardia com o lb300 (0.884/0.938):
+energia ≤300Hz (0.758), **consistência ciclo-a-ciclo p25 (0.852)**, **WST/wavelet-scattering (0.809)** — todas
+**redundantes** (fusão = wash ou pior). A consistência (p25 do excesso por ciclo) é o melhor feature de
+**interpretabilidade** — separa faint do normal (Absent 0.57 < I/VI 1.16 < II/VI 1.53 < III/VI 15.35), o que a
+média não faz — mas o CNN já a capta. **Conclusão calibrada (agora bem suportada por 4+ representações
+independentes):** o teto do faint **não é falta de representação/features**; é informacional **dadas estas
+gravações**. Única via plausível de informação nova (não testada): gravações melhores/denoising, dado externo
+pediátrico-rotulado-murmur. **Não re-testar features de áudio sobre a STFT.**
+Infra reutilizável: `scripts/pretrain_physionet2016.py` + flag `--init-encoder` (corrigido o make_cnn_args p/ propagá-la). A avenida phase-contrast+low-band está
 bem otimizada; ganho adicional só fora dela (reframe `Outcome` / transfer / demografia).
 
 ## Melhor modelo (baseline a bater)

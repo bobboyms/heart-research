@@ -18,6 +18,9 @@ scripts/.env
 circor-heart-sound-1.0.3/training_data/
 circor-heart-sound-1.0.3/training_data.csv
 
+# Dataset PhysioNet 2016 (transfer; baixar do PhysioNet)
+physionet-2016/
+
 # Outputs de experimentos (pesado, regenerável)
 **/outputs/
 **/outputs_*/
