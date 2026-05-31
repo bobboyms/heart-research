@@ -15,7 +15,7 @@ from tqdm.auto import tqdm
 from .audio import parse_recording_id, read_audio
 from .config import LABEL_DIASTOLE, LABEL_SYSTOLE, N_TEMPORAL_FEATURES, RecordingItem, StftConfig
 from .segments import extract_phase_audio, format_float_key, get_segments, parse_murmur_locations, phase_label_counts, phase_seconds_by_label, selected_phase_labels
-from .spectrogram import compute_temporal_features, peak_window_specs, phase_contrast_spectrogram, phase_spectrogram, phase_spectrogram_per_segment
+from .spectrogram import compute_temporal_features, cycle_denoised_phase_contrast, peak_window_specs, phase_contrast_spectrogram, phase_spectrogram, phase_spectrogram_per_segment
 
 
 def build_items(dataset_dir: Path, locations: list[str], max_recordings: int | None,
@@ -112,6 +112,8 @@ def cache_path(cache_dir: Path, item: RecordingItem, cfg: StftConfig) -> Path:
             key = f"{key}-dual"
         if getattr(cfg, "phase_contrast_robust", False):
             key = f"{key}-robust"
+        if getattr(cfg, "phase_contrast_cycle_median", False):
+            key = f"{key}-cycmed"
     if getattr(cfg, "use_ground_truth_segments", False):
         key = f"{key}_gtseg"
     if getattr(cfg, "use_temporal_features", False):
@@ -221,6 +223,8 @@ def prepare_spectrograms(
             diastole_segments = counts_by_label[LABEL_DIASTOLE] if LABEL_DIASTOLE in phase_labels else 0
             if phase_seconds < stft_cfg.min_systole_seconds:
                 spec = np.zeros((0, 0), dtype=np.float32)
+            elif getattr(stft_cfg, "phase_contrast_cycle_median", False):
+                spec = cycle_denoised_phase_contrast(audio, sample_rate, segments, stft_cfg)
             elif getattr(stft_cfg, "phase_contrast", False):
                 spec = phase_contrast_spectrogram(
                     audio, sample_rate, segments, stft_cfg,

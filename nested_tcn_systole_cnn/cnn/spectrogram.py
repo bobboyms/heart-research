@@ -224,6 +224,62 @@ _ROBUST_MAD_FLOOR = 0.03
 _ROBUST_Z_CLIP = 12.0
 
 
+def _resample_time(spec: np.ndarray, n_frames: int) -> np.ndarray:
+    """Linear-interpolate a (freq, t) spectrogram along time to exactly n_frames columns."""
+    t = spec.shape[1]
+    if t == n_frames:
+        return spec
+    if t < 1:
+        return np.zeros((spec.shape[0], n_frames), dtype=np.float32)
+    src = np.linspace(0.0, 1.0, t)
+    dst = np.linspace(0.0, 1.0, n_frames)
+    return np.stack([np.interp(dst, src, spec[f]) for f in range(spec.shape[0])]).astype(np.float32)
+
+
+def cycle_denoised_phase_contrast(
+    audio: np.ndarray,
+    sample_rate: int,
+    segments: pd.DataFrame,
+    cfg: StftConfig,
+    n_frames: int = 48,
+) -> np.ndarray:
+    """Cycle-synchronous denoise: represent systole by the MEDIAN spectrogram across its cardiac
+    cycles, then re-reference by the diastole baseline (phase-contrast), low band.
+
+    Each systole cycle's STFT is time-normalized to `n_frames` and stacked; the per-(freq, frame)
+    MEDIAN keeps what repeats every cycle (the murmur) and attenuates per-cycle-random noise — a
+    denoiser that cannot remove the murmur by construction. Diastole ref + low-band as usual.
+    """
+    resampled = resample_audio(audio, sample_rate, cfg.target_sample_rate)
+    chunks = _segment_audio_chunks(resampled, cfg.target_sample_rate, segments, (LABEL_SYSTOLE,), cfg.systole_margin_ms)
+    if not chunks:
+        return np.zeros((0, 0), dtype=np.float32)
+    low_hz = float(getattr(cfg, "low_hz", 0.0))
+    freq_mask = None
+    cyc = []
+    for seg_audio in chunks:
+        if len(seg_audio) < cfg.n_fft:
+            padded = np.zeros(cfg.n_fft, dtype=np.float32)
+            padded[: len(seg_audio)] = seg_audio
+            seg_audio = padded
+        freqs, _t, zxx = stft(seg_audio, fs=cfg.target_sample_rate, window="hann", nperseg=cfg.n_fft,
+                              noverlap=cfg.n_fft - cfg.hop_length, nfft=cfg.n_fft, boundary=None, padded=False)
+        spec = np.log1p(np.abs(zxx).astype(np.float32))
+        if freq_mask is None:
+            freq_mask = (freqs >= low_hz) & (freqs <= cfg.high_hz)
+        spec = spec[freq_mask]
+        if spec.shape[1] >= 1:
+            cyc.append(_resample_time(spec, n_frames))
+    if not cyc:
+        return np.zeros((0, 0), dtype=np.float32)
+    median_systole = np.median(np.stack(cyc), axis=0).astype(np.float32)  # (freq, n_frames) denoised
+    diastole = _phase_frames(audio, sample_rate, segments, (LABEL_DIASTOLE,), cfg)
+    if diastole.size > 0:
+        ref = np.median(diastole, axis=1, keepdims=True).astype(np.float32)
+        median_systole = (median_systole - ref).astype(np.float32)
+    return _crop_or_pad(median_systole, cfg.max_frames)
+
+
 def phase_contrast_spectrogram(
     audio: np.ndarray,
     sample_rate: int,

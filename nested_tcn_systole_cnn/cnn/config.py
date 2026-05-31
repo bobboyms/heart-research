@@ -68,6 +68,9 @@ class StftConfig:
     phase_contrast_dual: bool = False
     # Robust contrast: divide by the diastole MAD per frequency (robust z-score), per Grupo B v3.1.
     phase_contrast_robust: bool = False
+    # Cycle-synchronous denoise: median spectrogram across systole cycles (keeps the murmur, which
+    # repeats every cycle; attenuates per-cycle-random noise).
+    phase_contrast_cycle_median: bool = False
 
 
 @dataclass(frozen=True)

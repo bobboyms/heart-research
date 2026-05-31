@@ -319,6 +319,20 @@ média não faz — mas o CNN já a capta. **Conclusão calibrada (agora bem sup
 independentes):** o teto do faint **não é falta de representação/features**; é informacional **dadas estas
 gravações**. Única via plausível de informação nova (não testada): gravações melhores/denoising, dado externo
 pediátrico-rotulado-murmur. **Não re-testar features de áudio sobre a STFT.**
+
+**Denoise por mediana entre ciclos** (`--phase-contrast-cycle-median`, retreino lb300): AUPRC 0.8675 /
+AUROC 0.9397 — **shift, não ganho**. Sobe os faint (low-pitch 0.498→0.531, I/VI →0.627, FN 44→41) MAS sobe
+os Absent junto (0.081→0.093) → AUPRC −0.017; `29045` borrado (0.909→0.757, mediana dilui ciclo-único).
+Confirma parcialmente "ruído atrapalha o faint", mas limpar **desloca confiança, não adiciona separação**.
+5ª intervenção independente que não bate o lb300 → reforça o teto informacional.
+
+**SQI quality-gate** (`scripts/sqi_quality_detector.py`): juiz treinado no PhysioNet (CV AUROC 0.88) transfere
+relativamente (corr 0.48 c/ conf. segmentação) mas fusão tardia c/ lb300 = wash (qualidade ⊥ presença). 6ª
+intervenção sem ganho. **Interpretabilidade dos embeddings** (`scripts/probe_embeddings.py`): os faint
+PERDIDOS são **inseparáveis dos Absent no espaço do encoder** (RF AUROC 0.47; dist 2.38≈Absent 2.09 vs pegos
+3.71) → **limite de REPRESENTAÇÃO, não do head**. Como o humano ouviu o sopro na gravação, o sinal existe mas
+a representação não o contém → única via = SSL/perceptual (ou ruído de rótulo). Lead: segmentação GT pega
+89/104 I/VI (vs 64 TCN) → segmentação é gargalo real do faint.
 Infra reutilizável: `scripts/pretrain_physionet2016.py` + flag `--init-encoder` (corrigido o make_cnn_args p/ propagá-la). A avenida phase-contrast+low-band está
 bem otimizada; ganho adicional só fora dela (reframe `Outcome` / transfer / demografia).
 

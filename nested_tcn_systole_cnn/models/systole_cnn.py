@@ -108,6 +108,7 @@ def train_cnn_for_fold(
         phase_contrast=bool(getattr(args, "phase_contrast", False)),
         phase_contrast_dual=bool(getattr(args, "phase_contrast_dual", False)),
         phase_contrast_robust=bool(getattr(args, "phase_contrast_robust", False)),
+        phase_contrast_cycle_median=bool(getattr(args, "phase_contrast_cycle_median", False)),
         use_ground_truth_segments=bool(getattr(args, "use_ground_truth_segments", False)),
         use_temporal_features=bool(getattr(args, "use_temporal_features", False)),
         window_mode=getattr(args, "window_mode", "phase"),

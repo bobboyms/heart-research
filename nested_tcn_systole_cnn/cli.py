@@ -286,6 +286,15 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
+        "--phase-contrast-cycle-median",
+        action="store_true",
+        help=(
+            "Denoise por ciclo: representa a sístole pela MEDIANA do espectrograma entre os ciclos "
+            "cardíacos (mantém o sopro que repete; atenua ruído aleatório por ciclo), depois phase-contrast. "
+            "Implica --phase-contrast."
+        ),
+    )
+    parser.add_argument(
         "--phase-contrast-robust",
         action="store_true",
         help=(
@@ -506,8 +515,9 @@ def validate_args(args: argparse.Namespace) -> None:
             raise ValueError("--demographic is not supported with mixup.")
         if bool(getattr(args, "use_temporal_features", False)):
             raise ValueError("--demographic is not supported together with --use-temporal-features.")
-    if bool(getattr(args, "phase_contrast_dual", False)) or bool(getattr(args, "phase_contrast_robust", False)):
-        args.phase_contrast = True  # dual/robust are variants of phase-contrast
+    if (bool(getattr(args, "phase_contrast_dual", False)) or bool(getattr(args, "phase_contrast_robust", False))
+            or bool(getattr(args, "phase_contrast_cycle_median", False))):
+        args.phase_contrast = True  # dual/robust/cycle-median are variants of phase-contrast
     if bool(getattr(args, "phase_contrast", False)):
         if args.cnn_phase_mode != "systole":
             raise ValueError("--phase-contrast requires --cnn-phase-mode systole.")
